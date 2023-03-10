@@ -1,0 +1,41 @@
+FROM mambaorg/micromamba:0.22.0 as conda
+
+# Speed up the build, and avoid unnecessary writes to disk
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENV PIPENV_VENV_IN_PROJECT=true PIP_NO_CACHE_DIR=false PIP_DISABLE_PIP_VERSION_CHECK=1
+
+COPY docker/environment_tpu.yml /tmp/environment_tpu.yml
+COPY docker/requirements.txt /tmp/requirements.txt
+
+RUN micromamba create -y --file /tmp/environment_tpu.yml \
+    && micromamba clean --all --yes \
+    && find /opt/conda/ -follow -type f -name '*.pyc' -delete
+
+FROM debian:bullseye-slim as test-image
+
+COPY --from=conda /opt/conda/envs/. /opt/conda/envs/
+ENV PATH=/opt/conda/envs/imgx/bin/:$PATH APP_FOLDER=/app
+ENV PYTHONPATH=$APP_FOLDER:$PYTHONPATH
+ENV TZ=Europe/London
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+WORKDIR $APP_FOLDER
+
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+ENV USER=app
+ENV GROUP=app
+
+USER root
+RUN apt-get update && apt-get install -y apt-transport-https ca-certificates gnupg curl
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+RUN apt-get update && apt-get install google-cloud-cli
+
+ENV TF_CUDNN_DETERMINISTIC=1
+
+FROM test-image as run-image
+# The run-image (default) is the same as the dev-image with the some files directly
+# copied inside
+
+WORKDIR /${USER}/ImgX

@@ -1,0 +1,89 @@
+default_language_version:
+  python: python3
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-byte-order-marker
+      - id: check-builtin-literals
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-yaml
+      - id: debug-statements
+      - id: destroyed-symlinks
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+      - id: file-contents-sorter
+        files: "docker/requirements.txt"
+      - id: trailing-whitespace
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+  - repo: https://github.com/psf/black
+    rev: 23.1.0
+    hooks:
+      - id: black
+        args:
+          - --line-length=80
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.1.1
+    hooks:
+      - id: mypy
+        args:
+          [
+            --strict-equality,
+            --disallow-untyped-calls,
+            --disallow-untyped-defs,
+            --disallow-incomplete-defs,
+            --check-untyped-defs,
+            --disallow-untyped-decorators,
+            --warn-redundant-casts,
+            --warn-unused-ignores,
+            --no-warn-no-return,
+            --warn-unreachable,
+          ]
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.0.0-alpha.6
+    hooks:
+      - id: prettier
+        args:
+          - --print-width=80
+          - --prose-wrap=always
+          - --tab-width=2
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: "v0.0.254"
+    hooks:
+      - id: ruff
+  - repo: https://github.com/pre-commit/mirrors-pylint
+    rev: v3.0.0a5
+    hooks:
+      - id: pylint
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.3.1
+    hooks:
+      - id: pyupgrade
+        args:
+          - --py36-plus
+          - --py37-plus
+          - --py38-plus
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        args:
+          - --convention=google
+  - repo: local
+    hooks:
+      - id: wily
+        name: wily
+        entry: wily diff
+        verbose: false
+        language: python
+        additional_dependencies: [wily]

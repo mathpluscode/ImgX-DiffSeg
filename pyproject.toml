@@ -1,0 +1,89 @@
+[tool.ruff]
+line-length = 80
+
+# Enable Pyflakes `E` and `F` codes by default.
+select = [
+    "F", # Pyflakes
+    "E", "W", # pycodestyle
+    "UP", # pyupgrade
+    "N", # pep8-naming
+    # flake8
+    "YTT",
+    "ANN",
+    "S",
+    "BLE",
+    "B",
+    "A",
+    "C4",
+    "T10",
+    "EM",
+    "ISC",
+    "ICN",
+    "T20",
+    "PT",
+    "Q",
+    "RET",
+    "SIM",
+    "TID",
+    "ARG",
+    "DTZ",
+    "PIE",
+    "PGH", # pygrep-hooks
+    "RUF", # ruff
+    "PLC", "PLE", "PLR", "PLW",  # Pylint
+]
+ignore = [
+    "ANN002", # MissingTypeArgs
+    "ANN003", # MissingTypeKwargs
+    "ANN101", # MissingTypeSelf
+    "EM101", # Exception must not use a string literal, assign to variable first
+    "EM102", # Exception must not use an f-string literal, assign to variable first
+    "RET504", # Unnecessary variable assignment before `return` statement
+    "PLR0913", # Too many arguments to function call
+    "PLR0915", # Too many statements
+    "PLE0605", # Invalid format for `__all__`, must be `tuple` or `list`
+    "PLR0912", # Too many branches
+]
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Assume Python 3.8
+target-version = "py38"
+
+[tool.ruff.mccabe]
+# Unlike Flake8, default to a complexity level of 10.
+max-complexity = 10
+
+[tool.ruff.per-file-ignores]
+"test_*.py" = ["S101"]
+
+[tool.ruff.pydocstyle]
+# Use Google-style docstrings.
+convention = "google"
+
+[tool.ruff.pylint]
+allow-magic-value-types = ["int", "str"]
