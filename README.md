@@ -317,4 +317,11 @@ pytest --cov=imgx -n 4 tests
 
 ## Acknowledgement
 
-Research supported with Cloud TPUs from Google's TPU Research Cloud (TRC).
+This work was supported by the Wellcome/EPSRC Centre for Interventional and
+Surgical Sciences (203145Z/16/Z), the EPSRC funded Centre for Doctoral Training
+in Intelligent, Integrated Imaging in Healthcare (i4Health) (EP/S021930/1), the
+EPSRC grant EP/T029404/1), the International Alliance for Cancer Early
+Detection, an alliance between Cancer Research UK [C28070/A30912;
+C73666/A31378], Canary Center at Stanford University, the University of
+Cambridge, OHSU Knight Cancer Institute, University College London and the
+University of Manchester, and Cloud TPUs from Google's TPU Research Cloud (TRC).
