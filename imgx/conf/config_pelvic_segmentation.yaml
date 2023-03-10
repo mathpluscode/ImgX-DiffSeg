@@ -1,0 +1,81 @@
+debug: False
+seed: 0
+eval: False
+
+data:
+  name: male_pelvic_mr
+  max_num_samples: -1
+
+  male_pelvic_mr:
+    data_augmentation:
+      max_rotation: [0.088, 0.088, 0.088] # roughly 5 degrees
+      max_translation: [20, 20, 4]
+      max_scaling: [0.15, 0.15, 0.15]
+
+task:
+  name: "segmentation" # segmentation, diffusion
+  diffusion:
+    num_timesteps: 5
+    num_timesteps_beta: 1000
+    beta:
+      beta_schedule: "linear" # linear, quadradic, cosine, warmup10, warmup50
+      beta_start: 0.0001
+      beta_end: 0.02
+    model_out_type: "x_start" # x_start, x_previous, epsilon
+    model_var_type: "fixed_large" # fixed_small, fixed_large, learned, learned_range
+    recycle: True
+    x_space: "scaled_probs" # probabilities, logits
+    x_limit: 0.0 # <= 0 means no clipping
+    use_ddim: False
+
+model:
+  name: "unet3d"
+  remat: True
+  unet3d:
+    num_channels: [32, 64, 128, 256]
+  unet3d_slice:
+    num_channels: [32, 64, 128, 256]
+  unet3d_time:
+    num_channels: [32, 64, 128, 256]
+  unet3d_slice_time:
+    num_channels: [32, 64, 128, 256]
+
+loss:
+  dice: 1.0
+  dice_include_background: False
+  cross_entropy: 1.0
+  focal: 0.0
+  mse: 0.1
+
+training:
+  max_num_samples: 100_000
+  num_devices_per_replica: 1 # model is split into num_devices_per_replica shards/slices
+  batch_size: 8 # all model replicas are updated every `batch_size` samples
+  # each model replicate takes `batch_size_per_replica` samples per step
+  batch_size_per_replica: 1
+  mixed_precision:
+    use: True
+  ema:
+    use: False
+    decay: 0.9999
+
+optimizer:
+  name: "adamw"
+  kwargs:
+    b1: 0.9
+    b2: 0.999
+    weight_decay: 1e-08
+  grad_norm: 1.0
+  lr_schedule:
+    warmup_steps: 100
+    decay_steps: 10_000
+    init_value: 1e-05
+    peak_value: 1e-04
+    end_value: 1e-06
+
+logging:
+  eval_freq: 100
+  save_freq: 500
+  wandb:
+    project: imgx
+    entity: entity
