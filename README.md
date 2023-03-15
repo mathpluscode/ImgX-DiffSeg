@@ -216,13 +216,13 @@ automatically downloaded from
 `~/tensorflow_datasets` folder.
 
 ```bash
-tfds build imgx/dataset/male_pelvic_mr
+tfds build imgx/datasets/male_pelvic_mr
 ```
 
 Optionally, add flag `--overwrite` to overwrite the generated data set.
 
 ```bash
-tfds build imgx/dataset/male_pelvic_mr --overwrite
+tfds build imgx/datasets/male_pelvic_mr --overwrite
 ```
 
 ### AMOS CT
@@ -234,13 +234,13 @@ automatically downloaded from
 `~/tensorflow_datasets` folder.
 
 ```bash
-tfds build imgx/dataset/amos_ct
+tfds build imgx/datasets/amos_ct
 ```
 
 Optionally, add flag `--overwrite` to overwrite the generated data set.
 
 ```bash
-tfds build imgx/dataset/amos_ct --overwrite
+tfds build imgx/datasets/amos_ct --overwrite
 ```
 
 ## Experiment
