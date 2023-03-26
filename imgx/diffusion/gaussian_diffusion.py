@@ -539,7 +539,7 @@ class GaussianDiffusion(hk.Module):
         alphas_cumprod_prev = extract_and_expand(
             self.alphas_cumprod_prev, t, x_t.ndim
         )
-        coeff_start = alphas_cumprod_prev
+        coeff_start = jnp.sqrt(alphas_cumprod_prev)
         log_variance = (
             extract_and_expand(self.posterior_log_variance_clipped, t, x_t.ndim)
             * eta
