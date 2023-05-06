@@ -10,23 +10,17 @@ from typing import Callable, Iterator, Sequence, Tuple, Union
 import haiku as hk
 import jax.numpy as jnp
 import jax.random
-import numpy as np
 
 from imgx import EPS
+from imgx.diffusion.variance_schedule import (
+    DiffusionBetaSchedule,
+    downsample_beta_schedule,
+    get_beta_schedule,
+)
 from imgx.metric.distribution import (
     discretized_gaussian_log_likelihood,
     normal_kl,
 )
-
-
-class DiffusionBetaSchedule(enum.Enum):
-    """Class to define beta schedule."""
-
-    LINEAR = enum.auto()
-    QUADRADIC = enum.auto()
-    COSINE = enum.auto()
-    WARMUP10 = enum.auto()
-    WARMUP50 = enum.auto()
 
 
 class DiffusionModelOutputType(enum.Enum):
@@ -88,90 +82,6 @@ def extract_and_expand(
     return jnp.expand_dims(arr[t], axis=tuple(range(1, ndim)))
 
 
-def get_beta_schedule(
-    num_timesteps: int,
-    beta_schedule: DiffusionBetaSchedule,
-    beta_start: float,
-    beta_end: float,
-) -> jnp.ndarray:
-    """Get variance (beta) schedule for q(x_t | x_{t-1}).
-
-        TODO: open-source code used float64 for beta.
-
-    Args:
-        num_timesteps: number of time steps in total, T.
-        beta_schedule: schedule for beta.
-        beta_start: beta for t=0.
-        beta_end: beta for t=T.
-
-    Raises:
-        ValueError: for unknown schedule.
-    """
-    if beta_schedule == DiffusionBetaSchedule.LINEAR:
-        return jnp.linspace(
-            beta_start,
-            beta_end,
-            num_timesteps,
-        )
-    if beta_schedule == DiffusionBetaSchedule.QUADRADIC:
-        return (
-            jnp.linspace(
-                beta_start**0.5,
-                beta_end**0.5,
-                num_timesteps,
-            )
-            ** 2
-        )
-    if beta_schedule == DiffusionBetaSchedule.COSINE:
-
-        def alphas_cumprod(t: float) -> float:
-            """Eq 17 in https://arxiv.org/abs/2102.09672."""
-            return np.cos((t + 0.008) / 1.008 * np.pi / 2) ** 2
-
-        max_beta = 0.999
-        betas = []
-        for i in range(num_timesteps):
-            t1 = i / num_timesteps
-            t2 = (i + 1) / num_timesteps
-            beta = min(1 - alphas_cumprod(t2) / alphas_cumprod(t1), max_beta)
-            betas.append(beta)
-        return jnp.array(betas)
-
-    if beta_schedule == DiffusionBetaSchedule.WARMUP10:
-        num_timesteps_warmup = max(num_timesteps // 10, 1)
-        betas_warmup = (
-            jnp.linspace(
-                beta_start**0.5,
-                beta_end**0.5,
-                num_timesteps_warmup,
-            )
-            ** 2
-        )
-        return jnp.concatenate(
-            [
-                betas_warmup,
-                jnp.ones((num_timesteps - num_timesteps_warmup,)) * beta_end,
-            ]
-        )
-    if beta_schedule == DiffusionBetaSchedule.WARMUP50:
-        num_timesteps_warmup = max(num_timesteps // 2, 1)
-        betas_warmup = (
-            jnp.linspace(
-                beta_start**0.5,
-                beta_end**0.5,
-                num_timesteps_warmup,
-            )
-            ** 2
-        )
-        return jnp.concatenate(
-            [
-                betas_warmup,
-                jnp.ones((num_timesteps - num_timesteps_warmup,)) * beta_end,
-            ]
-        )
-    raise ValueError(f"Unknown beta_schedule {beta_schedule}.")
-
-
 @dataclasses.dataclass
 class GaussianDiffusion(hk.Module):
     """Class for Gaussian diffusion sampling.
@@ -228,24 +138,17 @@ class GaussianDiffusion(hk.Module):
 
         # shape are all (T,)
         # corresponding to 0, ..., T-1, where 0 means one step
-        self.betas = get_beta_schedule(
+        betas = get_beta_schedule(
             num_timesteps=num_timesteps_beta,
             beta_schedule=beta_schedule,
             beta_start=beta_start,
             beta_end=beta_end,
         )
-        if num_timesteps_beta % num_timesteps != 0:
-            raise ValueError(
-                f"num_timesteps_beta={num_timesteps_beta} "
-                f"can't be evenly divided by num_timesteps={num_timesteps}."
-            )
-        if num_timesteps != num_timesteps_beta:
-            # adjust beta
-            step_scale = num_timesteps_beta // num_timesteps
-            alphas = 1.0 - self.betas
-            alphas_cumprod = jnp.cumprod(alphas)
-            alphas_cumprod = alphas_cumprod[step_scale - 1 :: step_scale]
-            self.betas = 1.0 - alphas_cumprod[1:] / alphas_cumprod[:-1]
+        self.betas = downsample_beta_schedule(
+            betas=betas,
+            num_timesteps=num_timesteps_beta,
+            num_timesteps_to_keep=num_timesteps,
+        )
 
         alphas = 1.0 - self.betas  # alpha_t
         self.alphas_cumprod = jnp.cumprod(alphas)  # \bar{alpha}_t

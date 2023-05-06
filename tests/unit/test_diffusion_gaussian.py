@@ -75,12 +75,59 @@ class TestGaussianDiffusion(chex.TestCase):
     num_channels = (1, 2)
 
     num_timesteps = 5
-    num_timesteps_beta = 1000
+    num_timesteps_beta = 1001
     beta_schedule = DiffusionBetaSchedule.QUADRADIC
     beta_start = 0.0001
     beta_end = 0.02
     x_limit = 1.0
     use_ddim = False
+
+    @chex.variants(without_jit=True)
+    def test_attributes(
+        self,
+    ) -> None:
+        """Test attribute shape."""
+
+        @hk.testing.transform_and_run(jax_transform=self.variant)
+        def forward() -> GaussianDiffusion:
+            diffusion = GaussianDiffusion(
+                model=hk.Module(),
+                num_timesteps=self.num_timesteps,
+                num_timesteps_beta=self.num_timesteps_beta,
+                beta_schedule=self.beta_schedule,
+                beta_start=self.beta_start,
+                beta_end=self.beta_end,
+                model_out_type=DiffusionModelOutputType.X_START,
+                model_var_type=DiffusionModelVarianceType.FIXED_LARGE,
+                x_limit=self.x_limit,
+                x_space=DiffusionSpace.SCALED_PROBS,
+                use_ddim=self.use_ddim,
+            )
+            return diffusion
+
+        gd = forward()
+
+        chex.assert_shape(gd.betas, (self.num_timesteps,))
+        chex.assert_shape(gd.alphas_cumprod, (self.num_timesteps,))
+        chex.assert_shape(gd.alphas_cumprod_prev, (self.num_timesteps,))
+        chex.assert_shape(gd.alphas_cumprod_next, (self.num_timesteps,))
+        chex.assert_shape(gd.sqrt_alphas_cumprod, (self.num_timesteps,))
+        chex.assert_shape(
+            gd.sqrt_one_minus_alphas_cumprod, (self.num_timesteps,)
+        )
+        chex.assert_shape(
+            gd.log_one_minus_alphas_cumprod, (self.num_timesteps,)
+        )
+        chex.assert_shape(gd.sqrt_recip_alphas_cumprod, (self.num_timesteps,))
+        chex.assert_shape(
+            gd.sqrt_recip_alphas_cumprod_minus_one, (self.num_timesteps,)
+        )
+        chex.assert_shape(gd.posterior_mean_coeff_start, (self.num_timesteps,))
+        chex.assert_shape(gd.posterior_mean_coeff_t, (self.num_timesteps,))
+        chex.assert_shape(gd.posterior_variance, (self.num_timesteps,))
+        chex.assert_shape(
+            gd.posterior_log_variance_clipped, (self.num_timesteps,)
+        )
 
     @chex.all_variants
     @parameterized.named_parameters(

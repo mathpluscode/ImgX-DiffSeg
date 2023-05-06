@@ -16,7 +16,7 @@ task:
   name: "diffusion" # segmentation, diffusion
   diffusion:
     num_timesteps: 5
-    num_timesteps_beta: 1000
+    num_timesteps_beta: 1001
     beta:
       beta_schedule: "linear" # linear, quadradic, cosine, warmup10, warmup50
       beta_start: 0.0001
