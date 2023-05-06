@@ -1,9 +1,17 @@
 name: unit-test
 
 on:
-  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+  # Trigger the workflow on push or pull request,
+  # but only for the main branch
   push:
-    branches: [main]
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
