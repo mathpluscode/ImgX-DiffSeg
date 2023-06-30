@@ -6,8 +6,8 @@ dependencies:
   - pip=22.3.1
   - grpcio==1.43.0
   - pip:
-      - tensorflow-macos==2.11.0
-      - tensorflow-metal==0.7.0
+      - tensorflow-macos==2.12.0
+      - tensorflow-metal==0.8.0
       - jax==0.4.1
       - jaxlib==0.4.1
       - -r requirements.txt
