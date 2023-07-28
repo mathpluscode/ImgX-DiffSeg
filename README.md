@@ -1,34 +1,22 @@
 # Importance of Aligning Training Strategy with Evaluation for Diffusion Models in 3D Multiclass Segmentation
 
+:tada: This work has been accepted at
+[Deep Generative Models workshop at MICCAI 2023](https://dgm4miccai.github.io/).
+
+:bookmark_tabs: An updated manuscript has also been uploaded at
+[arXiv](https://arxiv.org/abs/2303.06040).
+
+:mag_right: We are working on a follow-up work, stay tuned.
+
+<div>
+<img src="images/method_x0.png" width="600" alt="figure2"></img>
+</div>
+
 <div>
 <img src="images/figure2.png" width="600" alt="figure2"></img>
 </div>
 
-## Results
-
-DS, NSD, HD, and CD represents Dice score, normalised surface Dice, 95%
-Hausdorff Distance, and centroid distance. The mean and standard deviations
-values are reported.
-
-### Prostate MR Data Set
-
-| Model | Diffusion Model | DS            | NSD           | HD            | CD            |
-| :---- | :-------------- | :------------ | :------------ | :------------ | :------------ |
-| 2D    | No              | 0.831 (0.098) | 0.638 (0.113) | 6.044 (1.031) | 2.824 (1.239) |
-| 2D    | Yes             | 0.818 (0.102) | 0.615 (0.118) | 6.658 (0.839) | 3.012 (1.174) |
-| 3D    | No              | 0.838 (0.088) | 0.648 (0.110) | 5.197 (1.184) | 2.675 (0.927) |
-| 3D    | Yes             | 0.830 (0.094) | 0.626 (0.112) | 5.424 (1.176) | 3.009 (1.165) |
-
-### Abdominal CT Data Set
-
-| Model | Diffusion Model | DS            | NSD           | HD             | CD            |
-| :---- | :-------------- | :------------ | :------------ | :------------- | :------------ |
-| 3D    | Yes             | 0.801 (0.109) | 0.540 (0.095) | 9.125 (2.564)  | 4.836 (2.273) |
-| 2D    | Yes             | 0.769 (0.127) | 0.520 (0.091) | 12.039 (2.932) | 5.121 (2.102) |
-| 3D    | No              | 0.816 (0.100) | 0.596 (0.084) | 9.091 (2.475)  | 4.275 (1.870) |
-| 2D    | No              | 0.804 (0.109) | 0.577 (0.082) | 9.885 (2.587)  | 4.416 (1.914) |
-
-### Reproduction
+## Reproduction
 
 Install the environment and build the dataset following the documentation. Then
 run one of the following sets of commands.
@@ -317,11 +305,10 @@ pytest --cov=imgx -n 4 tests
 
 ## Acknowledgement
 
-This work was supported by the Wellcome/EPSRC Centre for Interventional and
-Surgical Sciences (203145Z/16/Z), the EPSRC funded Centre for Doctoral Training
-in Intelligent, Integrated Imaging in Healthcare (i4Health) (EP/S021930/1), the
-EPSRC grant EP/T029404/1), the International Alliance for Cancer Early
-Detection, an alliance between Cancer Research UK [C28070/A30912;
-C73666/A31378], Canary Center at Stanford University, the University of
-Cambridge, OHSU Knight Cancer Institute, University College London and the
-University of Manchester, and Cloud TPUs from Google's TPU Research Cloud (TRC).
+This work was supported by the EPSRC grant (EP/T029404/1), the Wellcome/EPSRC
+Centre for Interventional and Surgical Sciences (203145Z/16/Z), the
+International Alliance for Cancer Early Detection, an alliance between Cancer
+Research UK (C28070/A30912, C73666/A31378), Canary Center at Stanford
+University, the University of Cambridge, OHSU Knight Cancer Institute,
+University College London and the University of Manchester, and Cloud TPUs from
+Google’s TPU Research Cloud (TRC).
