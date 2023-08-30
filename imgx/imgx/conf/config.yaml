@@ -1,0 +1,35 @@
+defaults:
+  - data: muscle_us
+  - task: gaussian_diff_seg
+
+debug: False
+seed: 0
+mixed_precision: True
+
+loss:
+  dice: 1.0
+  cross_entropy: 0.0
+  focal: 20.0
+  mse: 0.0
+  vlb: 0.0
+
+optimizer:
+  name: "adamw"
+  kwargs:
+    b1: 0.9
+    b2: 0.999
+    weight_decay: 1e-08
+  grad_norm: 1.0
+  lr_schedule:
+    warmup_steps: 100
+    decay_steps: 10_000
+    init_value: 1e-05
+    peak_value: 8e-04
+    end_value: 5e-05
+
+logging:
+  log_freq: 10
+  save_freq: 500
+  wandb:
+    project: imgx
+    entity: entity

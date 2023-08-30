@@ -1,0 +1,16 @@
+name: male_pelvic_mr
+
+loader:
+  max_num_samples_per_split: -1
+  patch_shape: [256, 256, 32]
+  patch_overlap: [0, 0, 16] # image shape is [256, 256, 48]
+  data_augmentation:
+    max_rotation: [0.088, 0.088, 0.088] # roughly 5 degrees
+    max_translation: [20, 20, 4]
+    max_scaling: [0.15, 0.15, 0.15]
+
+trainer:
+  max_num_samples: 100_000
+  batch_size: 8 # all model replicas are updated every `batch_size` samples
+  batch_size_per_replica: 1 # each model replicate takes `batch_size_per_replica` samples per step
+  num_devices_per_replica: 1 # model is split into num_devices_per_replica shards/slices

@@ -27,15 +27,37 @@ repos:
     hooks:
       - id: isort
   - repo: https://github.com/psf/black
-    rev: 23.1.0
+    rev: 23.7.0
     hooks:
       - id: black
         args:
           - --line-length=80
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.1.1
-    hooks:
+    rev: v1.4.1
+    hooks: # https://github.com/python/mypy/issues/4008#issuecomment-582458665
       - id: mypy
+        name: mypy-imgx
+        files: ^imgx/
+        entry: mypy imgx/
+        pass_filenames: false
+        args:
+          [
+            --strict-equality,
+            --disallow-untyped-calls,
+            --disallow-untyped-defs,
+            --disallow-incomplete-defs,
+            --check-untyped-defs,
+            --disallow-untyped-decorators,
+            --warn-redundant-casts,
+            --warn-unused-ignores,
+            --no-warn-no-return,
+            --warn-unreachable,
+          ]
+      - id: mypy
+        name: mypy-imgx_datasets
+        files: ^imgx_datasets/
+        entry: mypy imgx_datasets/
+        pass_filenames: false
         args:
           [
             --strict-equality,
@@ -50,7 +72,7 @@ repos:
             --warn-unreachable,
           ]
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.0.0-alpha.6
+    rev: v3.0.0
     hooks:
       - id: prettier
         args:
@@ -58,7 +80,7 @@ repos:
           - --prose-wrap=always
           - --tab-width=2
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.0.254"
+    rev: "v0.0.280"
     hooks:
       - id: ruff
   - repo: https://github.com/pre-commit/mirrors-pylint
@@ -66,13 +88,11 @@ repos:
     hooks:
       - id: pylint
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.3.1
+    rev: v3.9.0
     hooks:
       - id: pyupgrade
         args:
-          - --py36-plus
-          - --py37-plus
-          - --py38-plus
+          - --py39-plus
   - repo: https://github.com/pycqa/pydocstyle
     rev: 6.3.0
     hooks:

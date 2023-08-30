@@ -1,0 +1,9 @@
+name: "segmentation"
+
+model:
+  _target_: imgx.model.Unet
+  remat: True
+  num_spatial_dims: 3
+  patch_size: 2
+  num_channels: [32, 64, 128, 256]
+  out_channels: MISSING # will be set after loading config

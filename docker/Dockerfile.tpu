@@ -1,4 +1,4 @@
-FROM mambaorg/micromamba:0.22.0 as conda
+FROM mambaorg/micromamba:0.27.0 as conda
 
 # Speed up the build, and avoid unnecessary writes to disk
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
@@ -27,10 +27,11 @@ ENV USER=app
 ENV GROUP=app
 
 USER root
-RUN apt-get update && apt-get install -y apt-transport-https ca-certificates gnupg curl
+RUN apt-get update && apt-get install -y git vim unzip apt-transport-https ca-certificates gnupg curl make python3-opencv
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
 RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
 RUN apt-get update && apt-get install google-cloud-cli
+RUN git config --global --add safe.directory /${USER}/ImgX
 
 ENV TF_CUDNN_DETERMINISTIC=1
 

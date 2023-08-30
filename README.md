@@ -1,92 +1,61 @@
-# Importance of Aligning Training Strategy with Evaluation for Diffusion Models in 3D Multiclass Segmentation
+# A Recycling Training Strategy for Medical Image Segmentation with Diffusion Denoising Models
 
-:tada: This work has been accepted at
-[Deep Generative Models workshop at MICCAI 2023](https://dgm4miccai.github.io/).
+:tada: This is a follow-up work of Importance of Aligning Training Strategy with
+Evaluation for Diffusion Models in 3D Multiclass Segmentation
+([paper](https://arxiv.org/abs/2303.06040),
+[code](https://github.com/mathpluscode/ImgX-DiffSeg/tree/v0.1.0)), with better
+recycling method, better network, more baseline training methods (including
+self-conditioning) on four data sets (muscle ultrasound, male pelvic MR,
+abdominal CT, brain MR).
 
-:bookmark_tabs: An updated manuscript has also been uploaded at
-[arXiv](https://arxiv.org/abs/2303.06040).
-
-:mag_right: We are working on a follow-up work, stay tuned.
+:bookmark_tabs: The preprint is available on
+[arXiv](https://arxiv.org/abs/2308.16355).
 
 <div>
-<img src="images/method_x0.png" width="600" alt="figure2"></img>
+<img src="images/diffusion_training_strategy_diagram.png" width="600" alt="diffusion_training_strategy_diagram"></img>
 </div>
 
-<div>
-<img src="images/figure2.png" width="600" alt="figure2"></img>
-</div>
+---
 
-## Reproduction
+ImgX is a Jax-based deep learning toolkit for biomedical image segmentations.
 
-Install the environment and build the dataset following the documentation. Then
-run one of the following sets of commands.
+Current supported functionalities are summarized as follows.
 
-```bash
-# 3D diffusion for Prostate MR
-imgx_train --config-name config_pelvic_diffusion model.name=unet3d_time
-imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5
-imgx_test --log_dir wandb/latest-run/ --num_timesteps 5
+**Data sets**
 
-# 2D diffusion for Prostate MR
-imgx_train --config-name config_pelvic_diffusion model.name=unet3d_slice_time
-imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5
-imgx_test --log_dir wandb/latest-run/ --num_timesteps 5
+See the [readme](imgx_datasets/README.md) for details on training, validation,
+and test splits.
 
-# 3D diffusion for Abdominal CT
-imgx_train --config-name config_amos_diffusion model.name=unet3d_time
-imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5
-imgx_test --log_dir wandb/latest-run/ --num_timesteps 5
+- [x] Muscle ultrasound from
+      [Marzola et al. 2021](https://data.mendeley.com/datasets/3jykz7wz8d/1).
+- [x] Male pelvic MR from
+      [Li et al. 2022](https://zenodo.org/record/7013610#.Y1U95-zMKrM).
+- [x] AMOS CT from
+      [Ji et al. 2022](https://zenodo.org/record/7155725#.ZAN4BuzP2rO).
+- [x] Brain MR from [Baid et al. 2021](https://arxiv.org/abs/2107.02314).
 
-# 2D diffusion for Abdominal CT
-imgx_train --config-name config_amos_diffusion model.name=unet3d_slice_time
-imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5
-imgx_test --log_dir wandb/latest-run/ --num_timesteps 5
+**Algorithms**
 
-# 3D Non-diffusion for Prostate MR
-imgx_train --config-name config_pelvic_segmentation model.name=unet3d
-imgx_valid --log_dir wandb/latest-run/
-imgx_test --log_dir wandb/latest-run/
+- [x] Supervised segmentation.
+- [x] Diffusion-based segmentation.
+  - [x] Gaussian noise based diffusion.
+  - [x] Prediction of noise or ground truth.
+  - [x] Training with recycling or self-conditioning.
 
-# 2D Non-diffusion for Prostate MR
-imgx_train --config-name config_pelvic_segmentation model.name=unet3d_slide
-imgx_valid --log_dir wandb/latest-run/
-imgx_test --log_dir wandb/latest-run/
+**Models**
 
-# 3D Non-diffusion for Abdominal CT
-imgx_train --config-name config_amos_segmentation model.name=unet3d
-imgx_valid --log_dir wandb/latest-run/
-imgx_test --log_dir wandb/latest-run/
+- [x] U-Net with Transformers supporting 2D and 3D images.
 
-# 2D Non-diffusion for Abdominal CT
-imgx_train --config-name config_amos_segmentation model.name=unet3d_slide
-imgx_valid --log_dir wandb/latest-run/
-imgx_test --log_dir wandb/latest-run/
-```
+**Training**
 
-The ablation studies can be performed by adding one of following flags
+- [x] Patch-based training.
+- [x] Multi-device training (one model per device).
+- [x] Mixed precision training.
+- [x] Gradient clipping and accumulation.
 
-- Predict noise instead of mask: `task.diffusion.model_out_type=epsilon`
-- Do not use Dice loss: `loss.dice=0`
-- Do not recycle: `task.diffusion.recycle=False`
-- Change training denoising steps: `task.diffusion.num_timesteps=1000`
+---
 
-For instance, to deactivate Dice loss for 3D diffusion on Prostate MR data set:
-
-```bash
-imgx_train --config-name config_pelvic_diffusion model.name=unet3d_time loss.dice=0
-imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5
-imgx_test --log_dir wandb/latest-run/ --num_timesteps 5
-```
-
-The configurations are under `imgx/conf/`. If you have 2 GPUs and each GPU
-should take one image, please adjust the batch size to 2.
-
-```yaml
-batch_size: 2 # number of devices * batch size per device (GPU/TPU)
-batch_size_per_replica: 1 # batch size per device (GPU/TPU)
-```
-
-## Environment Setup
+## Installation
 
 ### TPU with Docker
 
@@ -118,8 +87,19 @@ container uses root user.
 3. Install the package inside container.
 
    ```bash
-   pip install -e .
+   make pip
    ```
+
+TPU often has limited disk space.
+[RAM disk](https://www.linuxbabe.com/command-line/create-ramdisk-linux) can be
+used to help.
+
+```bash
+sudo mkdir /tmp/ramdisk
+sudo chmod 777 /tmp/ramdisk
+sudo mount -t tmpfs -o size=256G imgxramdisk /tmp/ramdisk
+cd /tmp/ramdisk/
+```
 
 ### GPU with Docker
 
@@ -157,7 +137,7 @@ The following instructions have been tested only for CUDA == 11.4.1 and CUDNN ==
 3. Install the package inside container.
 
    ```bash
-   pip install -e .
+   make pip
    ```
 
 ### Local with Conda
@@ -190,80 +170,63 @@ Activate the environment and install the package.
 
 ```bash
 conda activate imgx
-pip install -e .
+make pip
 ```
 
-## Data Processing
+## Build Data Sets
 
-### Male Pelvic MR
-
-The data sets will be generated and processed by
-[TFDS](https://www.tensorflow.org/datasets/add_dataset). It will be
-automatically downloaded from
-[Zenodo](https://zenodo.org/record/7013610#.Y1U95-zMKrM) to
-`~/tensorflow_datasets` folder.
+Use the following commands to (re)build all data sets. Check the
+[README](imgx_datasets/README.md) of imgx_datasets for details. Especially,
+manual downloading is required for the BraTS 2021 dataset.
 
 ```bash
-tfds build imgx/datasets/male_pelvic_mr
-```
-
-Optionally, add flag `--overwrite` to overwrite the generated data set.
-
-```bash
-tfds build imgx/datasets/male_pelvic_mr --overwrite
-```
-
-### AMOS CT
-
-The data sets will be generated and processed by
-[TFDS](https://www.tensorflow.org/datasets/add_dataset). It will be
-automatically downloaded from
-[Zenodo](https://zenodo.org/record/7155725#.ZAN4BuzP2rO) to
-`~/tensorflow_datasets` folder.
-
-```bash
-tfds build imgx/datasets/amos_ct
-```
-
-Optionally, add flag `--overwrite` to overwrite the generated data set.
-
-```bash
-tfds build imgx/datasets/amos_ct --overwrite
+make build_dataset
+make rebuild_dataset
 ```
 
 ## Experiment
 
 ### Training and Testing
 
-Example command to use two GPUs for training.
+Example command to use two GPUs for training, validation and testing. The
+outputs are stored under `wandb/latest-run/files/`, where
+
+- `ckpt` stores the model checkpoints and corresponding validation metrics.
+- `test_evaluation` stores the prediction on test set and corresponding metrics.
 
 ```bash
+# limit to two GPUs if using NVIDIA GPUs
 export CUDA_VISIBLE_DEVICES="0,1"
-imgx_train --config-name config_pelvic_segmentation
-imgx_train --config-name config_pelvic_diffusion
-imgx_train --config-name config_amos_segmentation
-imgx_train --config-name config_amos_diffusion
+# select data set to use
+export DATASET_NAME="male_pelvic_mr"
+export DATASET_NAME="amos_ct"
+export DATASET_NAME="muscle_us"
+export DATASET_NAME="brats2021_mr"
+
+# Vanilla segmentation
+imgx_train data=${DATASET_NAME} task=seg
+imgx_valid --log_dir wandb/latest-run/
+imgx_test --log_dir wandb/latest-run/
+
+# Diffusion-based segmentation
+imgx_train data=${DATASET_NAME} task=gaussian_diff_seg
+imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDPM
+imgx_test --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDPM
+imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDIM
+imgx_test --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDIM
 ```
 
-After training, evaluate the trained models on the test data using the
-checkpoint having the best validation performance.
+```bash
+imgx_test --log_dir wandb/latest-run/ --num_timesteps 5 --num_seeds 3
+```
 
-1. For non-diffusion models:
+Optionally, for debug purposes, use flag `debug=True` to run the experiment with
+a small dataset and smaller models.
 
-   ```bash
-   imgx_valid --log_dir wandb/latest-run/
-   imgx_test --log_dir wandb/latest-run/
-   ```
-
-2. For diffusion models, set `num_seeds` if using ensemble:
-
-   ```bash
-   imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5
-   imgx_test --log_dir wandb/latest-run/ --num_timesteps 5 --num_seeds 5
-   imgx_test_ensemble --log_dir wandb/latest-run/
-   ```
-
-The metrics are stored under `wandb/latest-run/files/test_evaluation/`
+```bash
+imgx_train --config-name config_${DATASET_NAME}_seg debug=True
+imgx_train --config-name config_${DATASET_NAME}_diff_seg debug=True
+```
 
 ## Code Quality
 
@@ -294,6 +257,7 @@ pytest --cov=imgx -n 4 tests
 
 ## References
 
+- [Segment Anything (PyTorch)](https://github.com/facebookresearch/segment-anything)
 - [MONAI (PyTorch)](https://github.com/Project-MONAI/MONAI/)
 - [Cross Institution Few Shot Segmentation (PyTorch)](https://github.com/kate-sann5100/CrossInstitutionFewShotSegmentation/)
 - [MegSegDiff (PyTorch)](https://github.com/WuJunde/MedSegDiff/)
@@ -311,4 +275,29 @@ International Alliance for Cancer Early Detection, an alliance between Cancer
 Research UK (C28070/A30912, C73666/A31378), Canary Center at Stanford
 University, the University of Cambridge, OHSU Knight Cancer Institute,
 University College London and the University of Manchester, and Cloud TPUs from
-Google’s TPU Research Cloud (TRC).
+Google's TPU Research Cloud (TRC).
+
+## Citation
+
+If you find the code base and method useful in your research, please cite the
+relevant paper:
+
+```bibtex
+@article{fu2023recycling,
+  title={A Recycling Training Strategy for Medical Image Segmentation with Diffusion Denoising Models},
+  author={Fu, Yunguan and Li, Yiwen and Saeed, Shaheer U and Clarkson, Matthew J and Hu, Yipeng},
+  journal={arXiv preprint arXiv:2308.16355},
+  year={2023},
+  doi={10.48550/arXiv.2308.16355},
+  url={https://arxiv.org/abs/2308.16355},
+}
+
+@article{fu2023importance,
+  title={Importance of Aligning Training Strategy with Evaluation for Diffusion Models in 3D Multiclass Segmentation},
+  author={Fu, Yunguan and Li, Yiwen and Saeed, Shaheer U and Clarkson, Matthew J and Hu, Yipeng},
+  journal={arXiv preprint arXiv:2303.06040},
+  year={2023},
+  doi={10.48550/arXiv.2303.06040},
+  url={https://arxiv.org/abs/2303.06040},
+}
+```
