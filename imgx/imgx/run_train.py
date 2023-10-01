@@ -156,7 +156,7 @@ def main(  # pylint:disable=too-many-statements
         ):
             ckpt_dir = files_dir / "ckpt" / f"batch_{i}"
 
-        if config.eval and (ckpt_dir is not None):
+        if ckpt_dir is not None:
             # when diffusion save under sampler name
             out_dir = ckpt_dir
             if config.task.name == "diffusion_segmentation":
