@@ -1,0 +1,44 @@
+name: "diffusion_segmentation"
+
+recycling:
+  use: True
+  # max means the previous step is num_timesteps - 1
+  # next means the previous step is min(t+1, num_timesteps - 1)
+  prev_step: "max" # max or next
+  reverse_step: False
+
+self_conditioning:
+  use: False
+  probability: 0.5
+  prev_step: "next" # same or next
+
+uniform_time_sampling: False # False for importance sampling
+
+diffusion:
+  num_timesteps: 1001
+  num_timesteps_beta: 1001
+  beta_schedule: "linear" # linear, quadratic, cosine, warmup10, warmup50
+  beta_start: 0.0001
+  beta_end: 0.02
+  model_out_type: "x_start" # x_start, noise
+  model_var_type: "fixed_small" # fixed_small, fixed_large, learned, learned_range
+
+sampler:
+  name: "DDPM" # DDPM, DDIM
+  num_inference_timesteps: 5
+
+model:
+  _target_: imgx.model.Unet
+  remat: True
+  num_spatial_dims: 3
+  patch_size: 2
+  num_channels: [32, 64, 128, 256]
+  out_channels: MISSING # will be set after loading config
+  num_heads: 8
+  widening_factor: 4
+
+early_stopping: # used on validation set
+  metric: "mean_binary_dice_score_without_background"
+  mode: "max"
+  min_delta: 0.0001
+  patience: 5

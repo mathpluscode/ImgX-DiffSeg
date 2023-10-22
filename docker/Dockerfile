@@ -75,8 +75,8 @@ COPY docker/requirements.txt /${USER}/requirements.txt
 
 RUN /${USER}/conda/bin/pip3 install --upgrade pip \
     && /${USER}/conda/bin/pip3 install \
-      jax==0.4.8 \
-      jaxlib==0.4.7+cuda11.cudnn86 \
+      jax==0.4.14 \
+      jaxlib==0.4.14+cuda11.cudnn86 \
       -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html \
     && /${USER}/conda/bin/pip3 install tensorflow-cpu==2.12.0 \
     && /${USER}/conda/bin/pip3 install -r /${USER}/requirements.txt
