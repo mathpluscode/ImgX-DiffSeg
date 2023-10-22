@@ -1,6 +1,54 @@
-[tool.ruff]
-line-length = 80
+# package
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
 
+[project]
+name = "imgx"
+authors = [
+    {name = "Yunguan Fu", email = "yunguan.fu.18@ucl.ac.uk"},
+]
+description = "A Jax-based deep learning toolkit for biomedical applications."
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+version = "0.3.0"
+
+[project.scripts]
+imgx_train="imgx.run_train:main"
+imgx_valid="imgx.run_valid:main"
+imgx_test="imgx.run_test:main"
+
+[tool.setuptools]
+packages = ["imgx", "imgx_datasets"]
+package-dir = {"imgx"="./imgx", "imgx_datasets"="./imgx_datasets"}
+
+# pytest
+[tool.pytest.ini_options]
+markers = [
+    "slow",
+]
+
+# pre-commit
+[tool.isort]
+py_version=39
+known_third_party = ["SimpleITK","absl","chex","hydra","jax","numpy","omegaconf","optax",
+    "pandas","pytest","ray","rdkit","setuptools","tensorflow","tensorflow_datasets","tree","wandb"]
+multi_line_output = 3
+force_grid_wrap = 0
+line_length = 100
+include_trailing_comma = true
+use_parentheses = true
+
+[tool.mypy]
+python_version = "3.9"
+warn_unused_configs = true
+ignore_missing_imports = true
+disable_error_code = ["misc","attr-defined","call-arg"]
+show_error_codes = true
+files = "**/*.py"
+
+[tool.ruff]
+line-length = 100
 # Enable Pyflakes `E` and `F` codes by default.
 select = [
     "F", # Pyflakes
@@ -45,7 +93,6 @@ ignore = [
     "PLE0605", # Invalid format for `__all__`, must be `tuple` or `list`
     "PLR0912", # Too many branches
 ]
-
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
@@ -68,10 +115,8 @@ exclude = [
     "node_modules",
     "venv",
 ]
-
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-
 # Assume Python 3.9
 target-version = "py39"
 
@@ -81,6 +126,7 @@ max-complexity = 10
 
 [tool.ruff.per-file-ignores]
 "test_*.py" = ["S101"]
+"*_test.py" = ["S101"]
 
 [tool.ruff.pydocstyle]
 # Use Google-style docstrings.
@@ -88,8 +134,3 @@ convention = "google"
 
 [tool.ruff.pylint]
 allow-magic-value-types = ["int", "str"]
-
-[tool.pytest.ini_options]
-markers = [
-    "slow",
-]

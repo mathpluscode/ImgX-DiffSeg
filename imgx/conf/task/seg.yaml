@@ -1,0 +1,17 @@
+name: "segmentation"
+
+model:
+  _target_: imgx.model.Unet
+  remat: True
+  num_spatial_dims: 3
+  patch_size: 2
+  num_channels: [32, 64, 128, 256]
+  out_channels: MISSING # will be set after loading config
+  num_heads: 8
+  widening_factor: 4
+
+early_stopping: # used on validation set
+  metric: "mean_binary_dice_score_without_background"
+  mode: "max"
+  min_delta: 0.0001
+  patience: 5

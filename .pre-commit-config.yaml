@@ -2,7 +2,7 @@ default_language_version:
   python: python3
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: check-added-large-files
       - id: check-ast
@@ -27,13 +27,13 @@ repos:
     hooks:
       - id: isort
   - repo: https://github.com/psf/black
-    rev: 23.7.0
+    rev: 23.10.0
     hooks:
       - id: black
         args:
-          - --line-length=80
+          - --line-length=100
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.4.1
+    rev: v1.6.1
     hooks: # https://github.com/python/mypy/issues/4008#issuecomment-582458665
       - id: mypy
         name: mypy-imgx
@@ -72,15 +72,15 @@ repos:
             --warn-unreachable,
           ]
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.0.0
+    rev: v3.0.3
     hooks:
       - id: prettier
         args:
-          - --print-width=80
+          - --print-width=100
           - --prose-wrap=always
           - --tab-width=2
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.0.280"
+    rev: "v0.1.1"
     hooks:
       - id: ruff
   - repo: https://github.com/pre-commit/mirrors-pylint
@@ -88,7 +88,7 @@ repos:
     hooks:
       - id: pylint
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.9.0
+    rev: v3.15.0
     hooks:
       - id: pyupgrade
         args:
