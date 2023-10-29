@@ -24,7 +24,7 @@ download and build the data set, which will be built under `~/tensorflow_dataset
 Optionally, add flag `--overwrite` to rebuild/overwrite the data set.
 
 ```bash
-tfds build imgx_datasets/imgx_datasets/male_pelvic_mr
+tfds build imgx_datasets/male_pelvic_mr
 ```
 
 ## AMOS CT
@@ -43,7 +43,7 @@ download and build the data set, which will be built under `~/tensorflow_dataset
 Optionally, add flag `--overwrite` to rebuild/overwrite the data set.
 
 ```bash
-tfds build imgx_datasets/imgx_datasets/amos_ct
+tfds build imgx_datasets/amos_ct
 ```
 
 ## Muscle Ultrasound
@@ -61,7 +61,7 @@ download and build the data set, which will be built under `~/tensorflow_dataset
 Optionally, add flag `--overwrite` to rebuild/overwrite the data set.
 
 ```bash
-tfds build imgx_datasets/imgx_datasets/muscle_us
+tfds build imgx_datasets/muscle_us
 ```
 
 ## Brain MR
@@ -114,5 +114,5 @@ build the data set, which will be built under `~/tensorflow_datasets` folder. Op
 `--overwrite` to rebuild/overwrite the data set.
 
 ```bash
-tfds build imgx_datasets/imgx_datasets/brats2021_mr
+tfds build imgx_datasets/brats2021_mr
 ```
