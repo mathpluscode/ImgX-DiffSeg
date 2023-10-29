@@ -1,11 +1,19 @@
 # ImgX-DiffSeg
 
-ImgX-DiffSeg is a Jax-based deep learning toolkit using Flax for biomedical image segmentations.
+ImgX-DiffSeg is a Jax-based deep learning toolkit (now using Flax) for biomedical image
+segmentation.
 
-This repository includes the implementation of the following work
+This repository currently includes the implementation of the following work
 
 - [A Recycling Training Strategy for Medical Image Segmentation with Diffusion Denoising Models](https://arxiv.org/abs/2308.16355)
 - [Importance of Aligning Training Strategy with Evaluation for Diffusion Models in 3D Multiclass Segmentation](https://arxiv.org/abs/2303.06040)
+
+:construction: **The codebase is still under active development for more enhancements and
+applications.** :construction:
+
+:mailbox: Please feel free to
+[create an issue](https://github.com/mathpluscode/ImgX-DiffSeg/issues/new/choose) to request
+features or [reach out](https://orcid.org/0000-0002-1184-7421) for collaborations. :mailbox:
 
 <div>
 <img src="images/diffusion_training_strategy_diagram.png" width="600" alt="diffusion_training_strategy_diagram"></img>
