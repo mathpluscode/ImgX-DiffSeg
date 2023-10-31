@@ -229,9 +229,9 @@ Optionally, for debug purposes, use flag `debug=True` to run the experiment with
 smaller models.
 
 ```bash
-imgx_train --config-name config_${DATASET_NAME}_seg debug=True
+imgx_train data=${DATASET_NAME} task=seg debug=True
 imgx_test --log_dir wandb/latest-run/
-imgx_train --config-name config_${DATASET_NAME}_diff_seg debug=True
+imgx_train data=${DATASET_NAME} task=gaussian_diff_seg debug=True
 imgx_test --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDPM
 ```
 
