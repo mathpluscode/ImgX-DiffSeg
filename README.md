@@ -1,6 +1,6 @@
 # ImgX-DiffSeg
 
-ImgX-DiffSeg is a Jax-based deep learning toolkit using Flax for biomedical image segmentations.
+ImgX-DiffSeg is a Jax-based deep learning toolkit using Flax for biomedical image segmentation.
 
 This repository includes the implementation of the following work
 
@@ -11,14 +11,14 @@ This repository includes the implementation of the following work
 applications.** :construction:
 
 - November 2023:
-  - :warning: Upgrade to JAX to 0.4.20.
-  - :warning: Removed Haiku specific modification to convolutional layers. This may impact model
+  - :warning: Upgraded to JAX to 0.4.20.
+  - :warning: Removed Haiku-specific modification to convolutional layers. This may impact model
     performance.
-  - :smiley: Added example notebooks for inference on single image without TFDS.
-  - Added integration tests for training, validation and testing.
+  - :smiley: Added example notebooks for inference on a single image without TFDS.
+  - Added integration tests for training, validation, and testing.
   - Refactored config.
     - Added `patch_size` and `scale_factor` to data config.
-    - Moved loss config from main config to task config.
+    - Moved loss config from the main config to task config.
   - Refactored code, including defining `imgx/task` submodule.
 - October 2023: :sunglasses: Migrated from [Haiku](https://github.com/google-deepmind/dm-haiku) to
   [Flax](https://github.com/google/flax) following Google DeepMind's recommendation.
@@ -77,7 +77,8 @@ See the [readme](imgx_datasets/README.md) for further details.
 
 ### TPU with Docker
 
-The following instructions have been tested only for TPU-v3-8. The docker container uses root user.
+The following instructions have been tested only for TPU-v3-8. The docker container uses the root
+user.
 
 1. TPU often has limited disk space.
    [RAM disk](https://www.linuxbabe.com/command-line/create-ramdisk-linux) can be used to help.
@@ -111,7 +112,7 @@ The following instructions have been tested only for TPU-v3-8. The docker contai
    imgx bash
    ```
 
-4. Install the package inside container.
+4. Install the package inside the container.
 
    ```bash
    make pip
@@ -146,10 +147,10 @@ CUDA >= 11.8 is required. The docker container uses non-root user.
 
    where
 
-   - `--rm` removes the container once exit it.
-   - `-v` maps the current folder into container.
+   - `--rm` removes the container once exits it.
+   - `-v` maps the current folder into the container.
 
-3. Install the package inside container.
+3. Install the package inside the container.
 
    ```bash
    make pip
@@ -202,17 +203,17 @@ make rebuild_dataset
 
 ### Training and Testing
 
-Example command to use two GPUs for training, validation and testing. The outputs are stored under
+Example command to use two GPUs for training, validation, and testing. The outputs are stored under
 `wandb/latest-run/files/`, where
 
 - `ckpt` stores the model checkpoints and corresponding validation metrics.
-- `test_evaluation` stores the prediction on test set and corresponding metrics.
+- `test_evaluation` stores the prediction on the test set and corresponding metrics.
 
 ```bash
 # limit to two GPUs if using NVIDIA GPUs
 export CUDA_VISIBLE_DEVICES="0,1"
 
-# select data set to use
+# select the data set to use
 export DATASET_NAME="male_pelvic_mr"
 export DATASET_NAME="amos_ct"
 export DATASET_NAME="muscle_us"
@@ -229,8 +230,8 @@ imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDIM
 imgx_test --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDIM
 ```
 
-Optionally, for debug purposes, use flag `debug=True` to run the experiment with a small dataset and
-smaller models.
+Optionally, for debugging purposes, use the flag `debug=True` to run the experiment with a small
+dataset and smaller models.
 
 ```bash
 imgx_train data=${DATASET_NAME} task=seg debug=True
@@ -259,15 +260,15 @@ pre-commit run --all-files
 
 ### Code Test
 
-Run the command below to test and get coverage report. As JAX tests requires two CPUs, `-n 4` uses 4
-threads, therefore requires 8 CPUs in total.
+Run the command below to test and get a coverage report. As JAX tests require two CPUs, `-n 4` uses
+4 threads, therefore requires 8 CPUs in total.
 
 ```bash
 pytest --cov=imgx -n 4 imgx -k "not integration"
 pytest --cov=imgx_datasets -n 4 imgx_datasets
 ```
 
-`-k "not integration"` excludes integration tests, which requires downloading muscle ultrasound and
+`-k "not integration"` excludes integration tests, which require downloading muscle ultrasound and
 amos CT data sets.
 
 For integration tests, run the command below. `-s` enables the print of stdout. This test may take
