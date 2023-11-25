@@ -4,28 +4,6 @@ from __future__ import annotations
 import jax.numpy as jnp
 
 
-def get_coordinate_grid(shape: tuple[int, ...]) -> jnp.ndarray:
-    """Generate a grid with given shape.
-
-    This function is not jittable as the output depends on the value of shapes.
-
-    Args:
-        shape: shape of the grid, (d1, ..., dn).
-
-    Returns:
-        grid: grid coordinates, of shape  (n, d1, ..., dn).
-            grid[:, i1, ..., in] = [i1, ..., in]
-    """
-    return jnp.stack(
-        jnp.meshgrid(
-            *(jnp.arange(d) for d in shape),
-            indexing="ij",
-        ),
-        axis=0,
-        dtype=jnp.float32,
-    )
-
-
 def get_centroid(
     mask: jnp.ndarray,
     grid: jnp.ndarray,
@@ -52,7 +30,7 @@ def get_centroid(
     denominator = summed_mask[:, None, :]
     # if mask is not empty return real centroid, else nan
     centroid = jnp.where(condition=denominator > 0, x=numerator / denominator, y=jnp.nan)
-    return centroid, summed_mask == 0
+    return centroid, jnp.array(summed_mask == 0, dtype=jnp.bool_)
 
 
 def centroid_distance(

@@ -1,5 +1,5 @@
 """Test image data iterators, requires building datasets first."""
-
+from __future__ import annotations
 
 import chex
 import jax
@@ -10,9 +10,9 @@ from absl.testing import parameterized
 from chex._src import fake
 from omegaconf import DictConfig
 
-from imgx.data.iterator import DatasetIterator, get_image_tfds_dataset
+from imgx.data.iterator import DatasetIterator, add_foreground_range, get_image_tfds_dataset
 from imgx_datasets import AMOS_CT, BRATS2021_MR, INFO_MAP, MALE_PELVIC_MR, MUSCLE_US
-from imgx_datasets.constant import IMAGE, LABEL, UID
+from imgx_datasets.constant import FOREGROUND_RANGE, IMAGE, LABEL, UID
 
 
 # Set `FLAGS.chex_n_cpu_devices` CPU devices for all tests.
@@ -228,3 +228,73 @@ class TestImageShape(chex.TestCase):
             raise ValueError(
                 f"{err_paths} have less than {num_classes} classes including background."
             )
+
+
+@pytest.mark.parametrize(
+    ("batch", "expected"),
+    [
+        (
+            {LABEL: np.array([0, 1, 2, 3])},
+            np.array([[1, 3]]),
+        ),
+        (
+            {LABEL: np.array([1, 2, 3, 0])},
+            np.array([[0, 2]]),
+        ),
+        (
+            {LABEL: np.array([1, 2, 3, 4])},
+            np.array([[0, 3]]),
+        ),
+        (
+            {LABEL: np.array([0, 1, 2, 3, 4, 0, 0])},
+            np.array([[1, 4]]),
+        ),
+        (
+            {LABEL: np.array([[0, 1, 2, 3], [0, 1, 2, 3], [0, 0, 0, 0]])},
+            np.array([[0, 1], [1, 3]]),
+        ),
+        (
+            {
+                LABEL + "_1": np.array([0, 1, 2, 3]),
+                LABEL + "_2": np.array([1, 2, 3, 0]),
+            },
+            np.array([[0, 3]]),
+        ),
+        (
+            {
+                LABEL + "_1": np.array([0, 1, 2, 3]),
+                LABEL + "_2": np.array([0, 2, 3, 0]),
+            },
+            np.array([[1, 3]]),
+        ),
+        (
+            {},
+            None,
+        ),
+    ],
+    ids=[
+        "1d-left",
+        "1d-right",
+        "1d-none",
+        "1d-both",
+        "2d",
+        "1d two labels all foreground",
+        "1d two labels some foreground",
+        "no foreground",
+    ],
+)
+def test_get_foreground_range(
+    batch: dict[str, np.ndarray],
+    expected: np.ndarray | None,
+) -> None:
+    """Test get_translation_range return values.
+
+    Args:
+        batch: batch may have labels.
+        expected: expected range, if None means there is no labels in batch.
+    """
+    got = add_foreground_range(batch)
+    if expected is None:
+        assert FOREGROUND_RANGE not in got
+    else:
+        chex.assert_trees_all_equal(got[FOREGROUND_RANGE], expected)

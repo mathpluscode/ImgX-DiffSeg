@@ -16,6 +16,9 @@ from scipy.ndimage import binary_erosion, distance_transform_edt
 
 from imgx_datasets.preprocess import get_binary_mask_bounding_box
 
+OneArgScalarFunc = Callable[[np.ndarray], float]
+TwoArgsScalarFunc = Callable[[np.ndarray, np.ndarray], float]
+
 
 def get_mask_edges(mask_pred: np.ndarray, mask_true: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Do binary erosion and use XOR for input to get the edges.
@@ -70,7 +73,7 @@ def get_surface_distance(
 def _aggregated_symmetric_surface_distance(
     dist_pred_true: np.ndarray,
     dist_true_pred: np.ndarray,
-    f: Callable,
+    f: OneArgScalarFunc | TwoArgsScalarFunc,
     num_args: int,
 ) -> float:
     """Aggregate surface distance in a symmetric way.
@@ -98,7 +101,7 @@ def _aggregated_symmetric_surface_distance(
 def _aggregated_surface_distance(
     mask_pred: np.ndarray,
     mask_true: np.ndarray,
-    agg_fn_list: list[Callable],
+    agg_fn_list: list[OneArgScalarFunc | TwoArgsScalarFunc],
     num_args_list: list[int],
     spacing: tuple[float, ...] | None,
     symmetric: bool = True,
@@ -154,7 +157,7 @@ def _aggregated_surface_distance(
 def aggregated_surface_distance(
     mask_pred: np.ndarray,
     mask_true: np.ndarray,
-    agg_fns: Callable | list[Callable],
+    agg_fns: OneArgScalarFunc | TwoArgsScalarFunc | list[OneArgScalarFunc | TwoArgsScalarFunc],
     num_args: int | list[int],
     spacing: tuple[float, ...] | None,
     symmetric: bool = True,

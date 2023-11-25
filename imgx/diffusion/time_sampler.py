@@ -89,7 +89,7 @@ class TimeSampler:
 
     def sample_uniformly(
         self,
-        key: jax.random.KeyArray,
+        key: jax.Array,
         t_index_minval: jnp.ndarray,
         t_index_maxval: jnp.ndarray,
     ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
@@ -153,7 +153,7 @@ class TimeSampler:
 
     def sample_with_importance(
         self,
-        key: jax.random.KeyArray,
+        key: jax.Array,
         t_index_minval: jnp.ndarray,
         t_index_maxval: jnp.ndarray,
         probs: jnp.ndarray,
@@ -207,7 +207,7 @@ class TimeSampler:
 
     def sample(
         self,
-        key: jax.random.KeyArray,
+        key: jax.Array,
         batch_size: int,
         t_index_min: int,
         t_index_max: int,

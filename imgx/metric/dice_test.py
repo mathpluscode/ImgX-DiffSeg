@@ -178,7 +178,7 @@ class TestStability(chex.TestCase):
     )
     def test_shapes(
         self,
-        spatial_shape: tuple,
+        spatial_shape: tuple[int, ...],
         num_classes: int,
     ) -> None:
         """Test dice loss values.

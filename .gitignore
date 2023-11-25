@@ -41,7 +41,7 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .nox/
-.coverage
+.coverage*
 .coverage.*
 .cache
 nosetests.xml
@@ -137,6 +137,7 @@ dmypy.json
 # notebook
 *.ipynb
 notebooks/
+!examples/segmentation/inference.ipynb
 
 # hydra outputs
 outputs/

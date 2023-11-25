@@ -1,7 +1,7 @@
 """Module for configuration related functions."""
 
 
-def flatten_dict(d: dict, parent_key: str = "", sep: str = "_") -> dict:
+def flatten_dict(d: dict, parent_key: str = "", sep: str = "_") -> dict:  # type:ignore[type-arg]
     """Flat a nested dict.
 
     Args:

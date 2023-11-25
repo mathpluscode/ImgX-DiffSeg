@@ -7,56 +7,15 @@ import numpy as np
 from absl.testing import parameterized
 from chex._src import fake
 
+from imgx.data.warp import get_coordinate_grid
 from imgx.metric import centroid_distance
-from imgx.metric.centroid import get_centroid, get_coordinate_grid
+from imgx.metric.centroid import get_centroid
 
 
 # Set `FLAGS.chex_n_cpu_devices` CPU devices for all tests.
 def setUpModule() -> None:  # pylint: disable=invalid-name
     """Fake multi-devices."""
     fake.set_n_cpu_devices(2)
-
-
-class TestGrid(chex.TestCase):
-    """Test get_coordinate_grid."""
-
-    @chex.variants(without_jit=True)
-    @parameterized.named_parameters(
-        (
-            "1d",
-            (2,),
-            np.asarray([[0.0, 1.0]]),
-        ),
-        (
-            "2d",
-            (3, 2),
-            np.asarray(
-                [
-                    [
-                        [0.0, 0.0],
-                        [1.0, 1.0],
-                        [2.0, 2.0],
-                    ],
-                    [
-                        [0.0, 1.0],
-                        [0.0, 1.0],
-                        [0.0, 1.0],
-                    ],
-                ],
-            ),
-        ),
-    )
-    def test_values(self, shape: tuple[int, ...], expected: np.ndarray) -> None:
-        """Test exact values.
-
-        Args:
-            shape: shape of the grid, (d1, ..., dn).
-            expected: expected coordinates.
-        """
-        got = self.variant(get_coordinate_grid)(
-            shape=shape,
-        )
-        chex.assert_trees_all_equal(got, expected)
 
 
 class TestCentroid(chex.TestCase):

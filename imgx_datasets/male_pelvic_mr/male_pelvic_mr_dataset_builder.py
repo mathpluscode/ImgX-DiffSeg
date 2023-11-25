@@ -19,7 +19,7 @@ from imgx_datasets.constant import (
 )
 from imgx_datasets.dataset_info import OneHotLabeledDatasetInfo
 from imgx_datasets.preprocess import load_and_preprocess_image_and_label
-from imgx_datasets.util import save_uids
+from imgx_datasets.save import save_uids
 
 _DESCRIPTION = """
 The data set includes 589 T2-weighted images acquired from the same number of
@@ -44,6 +44,7 @@ _CITATION = """
 
 MALE_PELVIC_MR_TFDS_FOLD = "ZIP.zenodo.org_record_7013610_files_dataW0mCI6aH_V-TdeDbM4TdKelNcJ5ZxbAi5isebqCnMr0.zip"  # noqa: E501, pylint: disable=line-too-long
 MALE_PELVIR_MR_INFO = OneHotLabeledDatasetInfo(
+    name="male_pelvic_mr",
     tfds_preprocessed_dir=TFDS_EXTRACTED_DIR / MALE_PELVIC_MR_TFDS_FOLD / "preprocessed",
     image_spacing=(0.75, 0.75, 2.5),
     image_spatial_shape=(256, 256, 48),

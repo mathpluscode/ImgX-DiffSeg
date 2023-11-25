@@ -8,7 +8,27 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.experimental.numpy as tnp
 
-from imgx_datasets.constant import IMAGE
+from imgx_datasets.constant import IMAGE, LABEL
+
+
+def get_batch_size(
+    batch: dict[str, jnp.ndarray],
+) -> int:
+    """Get batch size from a batch.
+
+    Args:
+        batch: dict having images or labels.
+
+    Returns:
+        Batch size.
+    """
+    for k in batch:
+        if (LABEL in k) or (IMAGE in k):
+            # assume label related keys have label in name
+            return batch[k].shape[0]
+    raise ValueError(
+        f"No label or image in batch to get batch size, batch contains {batch.keys()}."
+    )
 
 
 def maybe_pad_batch(
@@ -56,8 +76,8 @@ def maybe_pad_batch(
     Raises:
         ValueError: if configs are conflicting.
     """
-    sample_tensor = batch[IMAGE]
-    batch_pad = batch_size - sample_tensor.shape[batch_dim]
+    curr_batch_size = get_batch_size(batch)
+    batch_pad = batch_size - curr_batch_size
 
     if is_train and batch_pad != 0:
         raise ValueError(
@@ -72,7 +92,7 @@ def maybe_pad_batch(
 
     def zero_pad(array: np.ndarray) -> np.ndarray:
         pad_with = [(0, 0)] * batch_dim + [(0, batch_pad)] + [(0, 0)] * (array.ndim - batch_dim - 1)
-        return np.pad(array, pad_with, mode="constant")
+        return np.pad(array, pad_with)
 
     padded_batch = jax.tree_map(zero_pad, batch)
     return padded_batch
@@ -100,7 +120,7 @@ def unpad(
     return jax.tree_map(_unpad_array, pytree)
 
 
-def tf_to_numpy(batch: dict) -> np.ndarray:
+def tf_to_numpy(batch: dict[str, tf.Tensor]) -> np.ndarray:
     """Convert an input batch from tf Tensors to numpy arrays.
 
     Args:

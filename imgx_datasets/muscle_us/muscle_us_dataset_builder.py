@@ -1,4 +1,5 @@
 """muscle_us dataset."""
+from __future__ import annotations
 
 from collections.abc import Generator
 from pathlib import Path
@@ -20,8 +21,7 @@ from imgx_datasets.constant import (
     VALID_SPLIT,
 )
 from imgx_datasets.dataset_info import OneHotLabeledDatasetInfo
-from imgx_datasets.image_io import load_2d_grayscale_image, save_2d_grayscale_image
-from imgx_datasets.util import save_uids
+from imgx_datasets.save import load_2d_grayscale_image, save_2d_grayscale_image, save_uids
 
 _DESCRIPTION = """
 The dataset included 3917 images of biceps brachii, tibialis anterior and
@@ -212,6 +212,7 @@ class MuscleUSDatasetInfo(OneHotLabeledDatasetInfo):
 
 MUSCLE_US_TFDS_FOLD = "ZIP.data.mend.com_publ-file_data_3jyk_file_b160-98XNE6wqHCOxLE8Ap4-__x82VYGr1POiW-quZggxPZSCk"  # noqa: E501, pylint: disable=line-too-long
 MUSCLE_US_INFO = MuscleUSDatasetInfo(
+    name="muscle_us",
     tfds_preprocessed_dir=TFDS_EXTRACTED_DIR / MUSCLE_US_TFDS_FOLD / "preprocessed",
     image_spacing=(1.0, 1.0),
     image_spatial_shape=(480, 512),

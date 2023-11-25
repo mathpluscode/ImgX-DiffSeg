@@ -1,4 +1,4 @@
-"""Test loss functions."""
+"""Test surface distance functions."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from absl.testing import parameterized
 from chex._src import fake
 
 from imgx.metric.surface_distance import (
+    OneArgScalarFunc,
+    TwoArgsScalarFunc,
     aggregated_surface_distance,
     average_surface_distance,
     get_mask_edges,
@@ -195,7 +197,7 @@ class TestSurfaceDistance(chex.TestCase):
     def test_nan_distance(
         self,
         ndims: int,
-        func: Callable,
+        func: Callable[[np.ndarray, np.ndarray], np.ndarray],
     ) -> None:
         """Test average_surface_distance returns nan given empty inputs.
 
@@ -246,7 +248,7 @@ class TestSurfaceDistance(chex.TestCase):
     def test_zero_distance(
         self,
         ndims: int,
-        func: Callable,
+        func: Callable[[np.ndarray, np.ndarray], np.ndarray],
     ) -> None:
         """Test average_surface_distance returns zero given same inputs.
 
@@ -575,7 +577,9 @@ class TestSurfaceDistance(chex.TestCase):
         mask_true: np.ndarray,
         spacing: tuple[float, ...],
         symmetric: bool,
-        agg_funcs: Callable | list[Callable],
+        agg_funcs: OneArgScalarFunc
+        | TwoArgsScalarFunc
+        | list[OneArgScalarFunc | TwoArgsScalarFunc],
         num_args: int | list[int],
         expected: np.ndarray,
     ) -> None:

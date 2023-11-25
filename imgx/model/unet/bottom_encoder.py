@@ -13,6 +13,7 @@ class BottomImageEncoderUnet(nn.Module):
 
     kernel_size: int = 3  # convolution layer kernel size
     num_heads: int = 8  # for multi head attention
+    num_layers: int = 1  # for transformer encoder
     widening_factor: int = 4  # for key size in MHA
     remat: bool = True  # reduces memory cost at cost of compute speed
     dtype: jnp.dtype = jnp.float32
@@ -48,7 +49,7 @@ class BottomImageEncoderUnet(nn.Module):
         image_emb = image_emb.reshape((batch_size, -1, model_size))
         transformer = TransformerEncoder(
             num_heads=self.num_heads,
-            num_layers=1,
+            num_layers=self.num_layers,
             autoregressive=False,
             widening_factor=self.widening_factor,
             remat=self.remat,

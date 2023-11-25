@@ -6,7 +6,7 @@ import flax.linen as nn
 import jax.numpy as jnp
 import numpy as np
 
-from imgx.model.basic import MLP, LayerNorm, truncated_normal
+from imgx.model.basic import MLP
 from imgx.model.efficient_attention import dot_product_attention_with_qkv_chunks
 
 
@@ -96,7 +96,7 @@ class TransformerEncoder(nn.Module):
         if self.add_position_embedding:
             positional_embeddings = self.param(
                 "transformer_positional_embeddings",
-                truncated_normal(stddev=0.02),
+                nn.initializers.truncated_normal(stddev=0.02),
                 (1, seq_len, model_size),
             )
             x += positional_embeddings
@@ -112,8 +112,8 @@ class TransformerEncoder(nn.Module):
                 attention_fn=attention_fn,
                 kernel_init=kernel_init,
                 dtype=self.dtype,
-            )(inputs_q=h, inputs_kv=h, mask=mask)
-            h_attn = LayerNorm(dtype=self.dtype)(h_attn)
+            )(inputs_q=h, inputs_k=h, inputs_v=h, mask=mask)
+            h_attn = nn.LayerNorm(dtype=self.dtype)(h_attn)
             h = h + h_attn
 
             h_dense = mlp_cls(
@@ -122,10 +122,10 @@ class TransformerEncoder(nn.Module):
                 dtype=self.dtype,
                 kernel_init=kernel_init,
             )(h)
-            h_dense = LayerNorm(dtype=self.dtype)(h_dense)
+            h_dense = nn.LayerNorm(dtype=self.dtype)(h_dense)
             h = h + h_dense
 
             # save intermediate hidden embeddings
             hidden_embeddings.append(h)
 
-        return LayerNorm(dtype=self.dtype)(h), hidden_embeddings
+        return nn.LayerNorm(dtype=self.dtype)(h), hidden_embeddings

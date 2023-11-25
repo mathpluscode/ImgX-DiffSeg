@@ -13,7 +13,7 @@ class DDPMSampler(GaussianDiffusion):
 
     def sample(
         self,
-        key: jax.random.KeyArray,
+        key: jax.Array,
         model_out: jnp.ndarray,
         x_t: jnp.ndarray,
         t_index: jnp.ndarray,
@@ -58,7 +58,7 @@ class DDIMSampler(GaussianDiffusion):
 
     def sample(
         self,
-        key: jax.random.KeyArray,
+        key: jax.Array,
         model_out: jnp.ndarray,
         x_t: jnp.ndarray,
         t_index: jnp.ndarray,

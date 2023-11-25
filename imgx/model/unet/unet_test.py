@@ -197,8 +197,8 @@ class TestUnet(chex.TestCase):
         chex.assert_shape(out, (self.batch_size, *in_shape, self.out_channels))
 
     @parameterized.named_parameters(
-        ("Unet without time", False, 34194, 26.643322),
-        ("Unet with time", True, 36106, 28.515594),
+        ("Unet without time", False, 34194, 27.610577),
+        ("Unet with time", True, 36106, 29.420588),
     )
     def test_params_count(
         self,
@@ -207,6 +207,8 @@ class TestUnet(chex.TestCase):
         expected_params_norm: float,
     ) -> None:
         """Count network parameters.
+
+        Changing layer/model names may change the initial parameters norm.
 
         Args:
             with_time: with time or not.

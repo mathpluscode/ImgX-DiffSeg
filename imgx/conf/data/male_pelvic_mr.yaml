@@ -14,3 +14,6 @@ trainer:
   batch_size: 8 # all model replicas are updated every `batch_size` samples
   batch_size_per_replica: 1 # each model replicate takes `batch_size_per_replica` samples per step
   num_devices_per_replica: 1 # model is split into num_devices_per_replica shards/slices
+
+patch_size: [2, 2, 2]
+scale_factor: [2, 2, 2]

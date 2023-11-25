@@ -5,6 +5,7 @@ repos:
     rev: v4.5.0
     hooks:
       - id: check-added-large-files
+        args: ["--maxkb=15000"]
       - id: check-ast
       - id: check-byte-order-marker
       - id: check-builtin-literals
@@ -27,18 +28,16 @@ repos:
     hooks:
       - id: isort
   - repo: https://github.com/psf/black
-    rev: 23.10.0
+    rev: 23.11.0
     hooks:
       - id: black
         args:
           - --line-length=100
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.6.1
+    rev: v1.7.1
     hooks: # https://github.com/python/mypy/issues/4008#issuecomment-582458665
       - id: mypy
-        name: mypy-imgx
-        files: ^imgx/
-        entry: mypy imgx/
+        name: mypy
         pass_filenames: false
         args:
           [
@@ -46,24 +45,7 @@ repos:
             --disallow-untyped-calls,
             --disallow-untyped-defs,
             --disallow-incomplete-defs,
-            --check-untyped-defs,
-            --disallow-untyped-decorators,
-            --warn-redundant-casts,
-            --warn-unused-ignores,
-            --no-warn-no-return,
-            --warn-unreachable,
-          ]
-      - id: mypy
-        name: mypy-imgx_datasets
-        files: ^imgx_datasets/
-        entry: mypy imgx_datasets/
-        pass_filenames: false
-        args:
-          [
-            --strict-equality,
-            --disallow-untyped-calls,
-            --disallow-untyped-defs,
-            --disallow-incomplete-defs,
+            --disallow-any-generics,
             --check-untyped-defs,
             --disallow-untyped-decorators,
             --warn-redundant-casts,
@@ -72,7 +54,7 @@ repos:
             --warn-unreachable,
           ]
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.0.3
+    rev: v3.1.0
     hooks:
       - id: prettier
         args:
@@ -80,7 +62,7 @@ repos:
           - --prose-wrap=always
           - --tab-width=2
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.1.1"
+    rev: "v0.1.6"
     hooks:
       - id: ruff
   - repo: https://github.com/pre-commit/mirrors-pylint

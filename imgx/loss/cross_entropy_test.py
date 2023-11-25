@@ -1,4 +1,4 @@
-"""Test dice loss functions."""
+"""Test cross entropy loss functions."""
 
 import chex
 import jax
