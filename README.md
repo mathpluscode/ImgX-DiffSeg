@@ -1,15 +1,27 @@
 # ImgX-DiffSeg
 
-ImgX-DiffSeg is a Jax-based deep learning toolkit (now using Flax) for biomedical image
-segmentation.
+ImgX-DiffSeg is a Jax-based deep learning toolkit using Flax for biomedical image segmentations.
 
-This repository currently includes the implementation of the following work
+This repository includes the implementation of the following work
 
 - [A Recycling Training Strategy for Medical Image Segmentation with Diffusion Denoising Models](https://arxiv.org/abs/2308.16355)
 - [Importance of Aligning Training Strategy with Evaluation for Diffusion Models in 3D Multiclass Segmentation](https://arxiv.org/abs/2303.06040)
 
 :construction: **The codebase is still under active development for more enhancements and
 applications.** :construction:
+
+- November 2023:
+  - :warning: Upgrade to JAX to 0.4.20.
+  - :warning: Removed Haiku specific modification to convolutional layers. This may impact model
+    performance.
+  - :smiley: Added example notebooks for inference on single image without TFDS.
+  - Added integration tests for training, validation and testing.
+  - Refactored config.
+    - Added `patch_size` and `scale_factor` to data config.
+    - Moved loss config from main config to task config.
+  - Refactored code, including defining `imgx/task` submodule.
+- October 2023: :sunglasses: Migrated from [Haiku](https://github.com/google-deepmind/dm-haiku) to
+  [Flax](https://github.com/google/flax) following Google DeepMind's recommendation.
 
 :mailbox: Please feel free to
 [create an issue](https://github.com/mathpluscode/ImgX-DiffSeg/issues/new/choose) to request
@@ -61,11 +73,6 @@ See the [readme](imgx_datasets/README.md) for further details.
 - Gradient clipping and accumulation.
 - [Early stopping](https://flax.readthedocs.io/en/latest/api_reference/flax.training.html).
 
-**Changelog**
-
-- October 2023: Migrated from [Haiku](https://github.com/google-deepmind/dm-haiku) to
-  [Flax](https://github.com/google/flax) following Google DeepMind's recommendation.
-
 ## Installation
 
 ### TPU with Docker
@@ -112,8 +119,7 @@ The following instructions have been tested only for TPU-v3-8. The docker contai
 
 ### GPU with Docker
 
-The following instructions have been tested only for CUDA == 11.4.1 and CUDNN == 8.2.0. The docker
-container uses non-root user.
+CUDA >= 11.8 is required. The docker container uses non-root user.
 [Docker image used may be removed.](https://gitlab.com/nvidia/container-images/cuda/blob/master/doc/support-policy.md)
 
 1. Build the docker image inside the repository.
@@ -141,7 +147,7 @@ container uses non-root user.
    where
 
    - `--rm` removes the container once exit it.
-   - `-v` maps the `ImgX` folder into container.
+   - `-v` maps the current folder into container.
 
 3. Install the package inside container.
 
@@ -214,12 +220,10 @@ export DATASET_NAME="brats2021_mr"
 
 # Vanilla segmentation
 imgx_train data=${DATASET_NAME} task=seg
-imgx_valid --log_dir wandb/latest-run/
 imgx_test --log_dir wandb/latest-run/
 
 # Diffusion-based segmentation
 imgx_train data=${DATASET_NAME} task=gaussian_diff_seg
-imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDPM
 imgx_test --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDPM
 imgx_valid --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDIM
 imgx_test --log_dir wandb/latest-run/ --num_timesteps 5 --sampler DDIM
@@ -259,8 +263,24 @@ Run the command below to test and get coverage report. As JAX tests requires two
 threads, therefore requires 8 CPUs in total.
 
 ```bash
-pytest --cov=imgx -n 4 imgx
+pytest --cov=imgx -n 4 imgx -k "not integration"
 pytest --cov=imgx_datasets -n 4 imgx_datasets
+```
+
+`-k "not integration"` excludes integration tests, which requires downloading muscle ultrasound and
+amos CT data sets.
+
+For integration tests, run the command below. `-s` enables the print of stdout. This test may take
+40-60 minutes.
+
+```bash
+pytest imgx/integration_test.py -s
+```
+
+To test the jupyter notebooks, run the command below.
+
+```bash
+pytest --nbmake examples/**/*.ipynb
 ```
 
 ## References

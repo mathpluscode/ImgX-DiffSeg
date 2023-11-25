@@ -19,7 +19,7 @@ from imgx_datasets.constant import (
 )
 from imgx_datasets.dataset_info import OneHotLabeledDatasetInfo
 from imgx_datasets.preprocess import load_and_preprocess_image_and_label
-from imgx_datasets.util import save_uids
+from imgx_datasets.save import save_uids
 
 _DESCRIPTION = """
 The data set includes 500 CT and 100 MR images from Amos:
@@ -45,6 +45,7 @@ _CITATION = """
 
 AMOS_CT_TFDS_FOLD = "ZIP.zenodo.org_record_7262581_files_amos22ZnMFi429bmx93zDuUBTrjdo9oGlndCnbGAVAP0I3p_M.zip"  # noqa: E501, pylint: disable=line-too-long
 AMOS_CT_INFO = OneHotLabeledDatasetInfo(
+    name="amos_ct",
     tfds_preprocessed_dir=TFDS_EXTRACTED_DIR / AMOS_CT_TFDS_FOLD / "preprocessed",
     image_spacing=(1.5, 1.5, 5.0),
     image_spatial_shape=(192, 128, 128),

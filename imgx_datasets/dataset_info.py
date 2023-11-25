@@ -10,12 +10,13 @@ import jax.numpy as jnp
 class DatasetInfo:
     """Data set class for imgx_datasets."""
 
+    name: str
     tfds_preprocessed_dir: Path
     image_spacing: tuple[float, ...]
     image_spatial_shape: tuple[int, ...]
     image_channels: int
-    class_names: tuple[str, ...]
-    classes_are_exclusive: bool
+    class_names: tuple[str, ...]  # for segmentation label only
+    classes_are_exclusive: bool  # for segmentation label only
 
     @property
     def input_image_shape(self) -> tuple[int, ...]:

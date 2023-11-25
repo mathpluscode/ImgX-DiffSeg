@@ -4,11 +4,18 @@ model:
   _target_: imgx.model.Unet
   remat: True
   num_spatial_dims: 3
-  patch_size: 2
+  patch_size: MISSING # data dependent, will be set after loading config
+  scale_factor: MISSING # data dependent, will be set after loading config
   num_channels: [32, 64, 128, 256]
-  out_channels: MISSING # will be set after loading config
+  out_channels: MISSING # data dependent, will be set after loading config
   num_heads: 8
   widening_factor: 4
+  num_transform_layers: 1
+
+loss:
+  dice: 1.0
+  cross_entropy: 0.0
+  focal: 20.0
 
 early_stopping: # used on validation set
   metric: "mean_binary_dice_score_without_background"

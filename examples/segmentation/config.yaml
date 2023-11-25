@@ -1,0 +1,83 @@
+data:
+  name: muscle_us
+  loader:
+    max_num_samples_per_split: -1
+    patch_shape:
+      - 480
+      - 512
+    patch_overlap:
+      - 0
+      - 0
+    data_augmentation:
+      max_rotation:
+        - 0.088
+      max_translation:
+        - 10
+        - 10
+      max_scaling:
+        - 0.15
+        - 0.15
+  trainer:
+    max_num_samples: 512000
+    batch_size: 64
+    batch_size_per_replica: 8
+    num_devices_per_replica: 1
+  patch_size:
+    - 2
+    - 2
+  scale_factor:
+    - 2
+    - 2
+task:
+  name: segmentation
+  model:
+    _target_: imgx.model.Unet
+    remat: true
+    num_spatial_dims: 2
+    patch_size:
+      - 2
+      - 2
+    scale_factor:
+      - 2
+      - 2
+    num_channels:
+      - 8
+      - 16
+      - 32
+      - 64
+    out_channels: 2
+    num_heads: 8
+    widening_factor: 4
+    num_transform_layers: 1
+  loss:
+    dice: 1.0
+    cross_entropy: 0.0
+    focal: 20.0
+  early_stopping:
+    metric: mean_binary_dice_score_without_background
+    mode: max
+    min_delta: 0.0001
+    patience: 10
+debug: false
+seed: 0
+half_precision: true
+optimizer:
+  name: adamw
+  kwargs:
+    b1: 0.9
+    b2: 0.999
+    weight_decay: 1.0e-08
+  grad_norm: 1.0
+  lr_schedule:
+    warmup_steps: 100
+    decay_steps: 10000
+    init_value: 1.0e-05
+    peak_value: 0.0008
+    end_value: 5.0e-05
+logging:
+  root_dir: null
+  log_freq: 10
+  save_freq: 100
+  wandb:
+    project: imgx
+    entity: entity

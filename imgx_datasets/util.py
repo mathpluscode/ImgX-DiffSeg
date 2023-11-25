@@ -5,11 +5,7 @@ https://github.com/google-research/scenic/blob/03735eb81f64fd1241c4efdb946ea6de3
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
-import pandas as pd
-from absl import logging
 
 
 def get_center_pad_shape(
@@ -135,25 +131,3 @@ def get_center_crop_shape_from_bbox(
         crop_lower.append(crop_lower_i)
         crop_upper.append(crop_upper_i)
     return tuple(crop_lower), tuple(crop_upper)
-
-
-def save_uids(
-    train_uids: list[str],
-    valid_uids: list[str],
-    test_uids: list[str],
-    out_dir: Path,
-) -> None:
-    """Save uids to csv files.
-
-    Args:
-        train_uids: list of training uids.
-        valid_uids: list of validation uids.
-        test_uids: list of test uids.
-        out_dir: directory to save the csv files.
-    """
-    pd.DataFrame({"uid": train_uids}).to_csv(out_dir / "train_uids.csv", index=False)
-    pd.DataFrame({"uid": valid_uids}).to_csv(out_dir / "valid_uids.csv", index=False)
-    pd.DataFrame({"uid": test_uids}).to_csv(out_dir / "test_uids.csv", index=False)
-    logging.info(f"There are {len(train_uids)} training samples.")
-    logging.info(f"There are {len(valid_uids)} validation samples.")
-    logging.info(f"There are {len(test_uids)} test samples.")

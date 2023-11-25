@@ -1,4 +1,4 @@
-FROM mambaorg/micromamba:0.27.0 as conda
+FROM mambaorg/micromamba:1.5.1 as conda
 
 # Speed up the build, and avoid unnecessary writes to disk
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1

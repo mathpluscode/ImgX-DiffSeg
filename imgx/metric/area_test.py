@@ -5,7 +5,7 @@ import numpy as np
 from absl.testing import parameterized
 from chex._src import fake
 
-from imgx.metric.area import class_proportion
+from imgx.metric import class_proportion
 
 
 # Set `FLAGS.chex_n_cpu_devices` CPU devices for all tests.

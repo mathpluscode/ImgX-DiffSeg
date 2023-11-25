@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import flax.linen as nn
+import jax
 import jax.numpy as jnp
 
 from imgx.model.basic import sinusoidal_positional_embedding
 from imgx.model.slice import merge_spatial_dim_into_batch, split_spatial_dim_from_batch
 from imgx.model.unet.bottom_encoder import BottomImageEncoderUnet
-from imgx.model.unet.image_encoder import ImageEncoderUnet
-from imgx.model.unet.mask_decoder import MaskDecoderUnet
+from imgx.model.unet.downsample_encoder import DownsampleEncoder
+from imgx.model.unet.upsample_decoder import UpsampleDecoder
 
 
 class Unet(nn.Module):
@@ -26,6 +27,8 @@ class Unet(nn.Module):
     kernel_size: int = 3  # convolution layer kernel size
     num_heads: int = 8  # for multi head attention/MHA
     widening_factor: int = 4  # for key size in MHA
+    num_transform_layers: int = 1  # for transformer encoder
+    out_kernel_init: jax.nn.initializers.Initializer = nn.linear.default_kernel_init
     remat: bool = True  # remat reduces memory cost at cost of compute speed
     dtype: jnp.dtype = jnp.float32
 
@@ -81,7 +84,7 @@ class Unet(nn.Module):
             )
 
         # image encoder
-        embeddings = ImageEncoderUnet(
+        embeddings = DownsampleEncoder(
             num_spatial_dims=self.num_spatial_dims,
             num_channels=self.num_channels,
             patch_size=self.patch_size,
@@ -100,13 +103,14 @@ class Unet(nn.Module):
             kernel_size=self.kernel_size,
             num_heads=self.num_heads,
             widening_factor=self.widening_factor,
+            num_layers=self.num_transform_layers,
             remat=self.remat,
             dtype=self.dtype,
         )(image_emb=image_emb, t_emb=t_emb)
         embeddings.append(image_emb)
 
         # mask decoder
-        out = MaskDecoderUnet(
+        out = UpsampleDecoder(
             num_spatial_dims=self.num_spatial_dims,
             out_channels=self.out_channels,
             num_channels=self.num_channels,
@@ -115,6 +119,7 @@ class Unet(nn.Module):
             num_res_blocks=self.num_res_blocks,
             kernel_size=self.kernel_size,
             widening_factor=self.widening_factor,
+            out_kernel_init=self.out_kernel_init,
             remat=self.remat,
             dtype=self.dtype,
         )(embeddings=embeddings, t_emb=t_emb)

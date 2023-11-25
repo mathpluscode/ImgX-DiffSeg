@@ -6,8 +6,8 @@ import chex
 import numpy as np
 import pytest
 
-from imgx_datasets.image_io import load_2d_grayscale_image
 from imgx_datasets.muscle_us.muscle_us_dataset_builder import select_connected_component
+from imgx_datasets.save import load_2d_grayscale_image
 
 
 @pytest.mark.parametrize(

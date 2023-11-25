@@ -48,8 +48,8 @@ class TestBatchPatchRandomSample(chex.TestCase):
     )
     def test_shapes(
         self,
-        patch_shape: tuple,
-        image_shape: tuple,
+        patch_shape: tuple[int, ...],
+        image_shape: tuple[int, ...],
         num_channels: int,
     ) -> None:
         """Test random cropped patch shapes.
@@ -194,9 +194,9 @@ class TestGetPatchGrid(chex.TestCase):
     )
     def test_values(
         self,
-        patch_shape: tuple,
-        image_shape: tuple,
-        patch_overlap: tuple,
+        patch_shape: tuple[int, ...],
+        image_shape: tuple[int, ...],
+        patch_overlap: tuple[int, ...],
         expected: jnp.ndarray,
     ) -> None:
         """Test get_patch_grid return values.
@@ -242,9 +242,9 @@ class TestBatchPatchGridSample(chex.TestCase):
     )
     def test_shapes(
         self,
-        patch_shape: tuple,
-        image_shape: tuple,
-        patch_overlap: tuple,
+        patch_shape: tuple[int, ...],
+        image_shape: tuple[int, ...],
+        patch_overlap: tuple[int, ...],
         num_patches: int,
         num_channels: int,
     ) -> None:
@@ -335,9 +335,9 @@ class TestAddPatchWithChannel(chex.TestCase):
     )
     def test_values(
         self,
-        patch_shape: tuple,
-        image_shape: tuple,
-        start_indices: tuple,
+        patch_shape: tuple[int, ...],
+        image_shape: tuple[int, ...],
+        start_indices: tuple[int, ...],
         num_channels: int,
     ) -> None:
         """Test add_patch_with_channel shapes.
@@ -422,9 +422,9 @@ class TestBatchPatchGridMeanAggregate(chex.TestCase):
     )
     def test_shapes(
         self,
-        patch_shape: tuple,
-        image_shape: tuple,
-        patch_overlap: tuple,
+        patch_shape: tuple[int, ...],
+        image_shape: tuple[int, ...],
+        patch_overlap: tuple[int, ...],
         num_channels: int,
     ) -> None:
         """Test batch_patch_grid_mean_aggregate shapes.

@@ -85,11 +85,12 @@ def shard(
     return jax.tree_map(_shard_array, pytree)
 
 
-def unshard(pytree: chex.ArrayTree) -> chex.ArrayTree:
+def unshard(pytree: chex.ArrayTree, device: jax.Device) -> chex.ArrayTree:
     """Reshapes arrays from [ndev, bs, ...] to [host_bs, ...].
 
     Args:
         pytree: A pytree of arrays to be sharded.
+        device: device to put.
 
     Returns:
         Sharded data.
@@ -99,4 +100,5 @@ def unshard(pytree: chex.ArrayTree) -> chex.ArrayTree:
         ndev, bs = array.shape[:2]
         return array.reshape((ndev * bs,) + array.shape[2:])
 
+    pytree = jax.device_put(pytree, device)
     return jax.tree_map(_unshard_array, pytree)

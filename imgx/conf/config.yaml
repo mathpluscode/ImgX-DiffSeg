@@ -1,17 +1,13 @@
 defaults:
   - data: muscle_us
   - task: gaussian_diff_seg
+  # config below overwrites the values above
+  # https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/default_composition_order/
+  - _self_
 
 debug: False
 seed: 0
 half_precision: True
-
-loss:
-  dice: 1.0
-  cross_entropy: 0.0
-  focal: 20.0
-  mse: 0.0
-  vlb: 0.0
 
 optimizer:
   name: "adamw"
@@ -28,6 +24,7 @@ optimizer:
     end_value: 5e-05
 
 logging:
+  root_dir:
   log_freq: 10
   save_freq: 500
   wandb:

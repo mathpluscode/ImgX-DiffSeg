@@ -5,12 +5,15 @@ from pathlib import Path
 
 import chex
 import jax
+import jax.numpy as jnp
 import tensorflow as tf
+from absl import logging
 from flax import jax_utils
 from omegaconf import DictConfig
 
 from imgx.data.iterator import get_image_tfds_dataset
-from imgx.segmentation.train_state import TrainState
+from imgx.metric.util import aggregate_pmap_metrics
+from imgx.train_state import TrainState
 from imgx_datasets import INFO_MAP
 
 
@@ -24,8 +27,15 @@ class Experiment:
             config: experiment config.
         """
         # Do not use accelerators in data pipeline.
-        tf.config.experimental.set_visible_devices([], device_type="GPU")
-        tf.config.experimental.set_visible_devices([], device_type="TPU")
+        try:
+            tf.config.set_visible_devices([], device_type="GPU")
+            tf.config.set_visible_devices([], device_type="TPU")
+        except RuntimeError:
+            logging.error(
+                f"Failed to set visible devices, data set may be using GPU/TPUs. "
+                f"Visible GPU devices: {tf.config.get_visible_devices('GPU')}. "
+                f"Visible TPU devices: {tf.config.get_visible_devices('TPU')}."
+            )
 
         # save config
         self.config = config
@@ -45,6 +55,9 @@ class Experiment:
             self.valid_iter = jax_utils.prefetch_to_device(self.valid_iter, 2)
             self.test_iter = jax_utils.prefetch_to_device(self.test_iter, 2)
 
+        self.p_train_step = None  # To be defined in train_init
+        self.p_eval_step = None  # To be defined in train_init
+
     def train_init(
         self, ckpt_dir: Path | None = None, step: int | None = None
     ) -> tuple[TrainState, int]:
@@ -60,8 +73,8 @@ class Experiment:
         raise NotImplementedError
 
     def train_step(
-        self, train_state: TrainState, key: jax.random.PRNGKeyArray
-    ) -> tuple[TrainState, jax.random.PRNGKeyArray, chex.ArrayTree]:
+        self, train_state: TrainState, key: jax.Array
+    ) -> tuple[TrainState, jax.Array, chex.ArrayTree]:
         """Perform a training step.
 
         Args:
@@ -73,16 +86,24 @@ class Experiment:
             - new random key.
             - metric dict.
         """
-        raise NotImplementedError
+        batch = next(self.train_iter)
+        train_state, key, metrics = self.p_train_step(  # pylint: disable=not-callable
+            train_state,
+            batch,
+            key,
+        )
+        metrics = aggregate_pmap_metrics(metrics)
+        metrics = jax.tree_map(lambda x: x.item(), metrics)  # tensor to values
+        return train_state, key, metrics
 
     def eval_step(
         self,
         train_state: TrainState,
-        key: jax.random.PRNGKeyArray,
+        key: jax.Array,
         split: str,
         out_dir: Path | None = None,
-    ) -> tuple[jax.random.PRNGKeyArray, chex.ArrayTree]:
-        """Evaluation on entire validation data set.
+    ) -> tuple[jax.Array, chex.ArrayTree]:
+        """Evaluation on entire validation/test data set.
 
         Args:
             train_state: training state.
@@ -93,5 +114,35 @@ class Experiment:
         Returns:
             random key.
             metric dict.
+        """
+        raise NotImplementedError
+
+    def eval_batch(
+        self,
+        train_state: TrainState,
+        key: jax.Array,
+        batch: dict[str, jnp.ndarray],
+        uids: list[str],
+        device_cpu: jax.Device,
+        out_dir: Path | None,
+        reference_suffix: str = "mask_preprocessed",
+        output_suffix: str = "mask_pred",
+    ) -> tuple[dict[str, jnp.ndarray], jnp.ndarray, jax.Array]:
+        """Evaluate a batch.
+
+        Args:
+            train_state: training state.
+            key: random key.
+            batch: batch data without uid.
+            uids: uids in the batch.
+            device_cpu: cpu device.
+            out_dir: output directory, if not None, predictions will be saved.
+            reference_suffix: suffix of reference image.
+            output_suffix: suffix of output image.
+
+        Returns:
+            metrics, each item has shape (num_shards*batch,).
+            label_pred: predicted label, of shape (num_shards*batch, *spatial_shape).
+            key: random key.
         """
         raise NotImplementedError

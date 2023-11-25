@@ -22,7 +22,7 @@ from imgx_datasets.constant import (
 )
 from imgx_datasets.dataset_info import DatasetInfo
 from imgx_datasets.preprocess import clip_and_normalise_intensity
-from imgx_datasets.util import save_uids
+from imgx_datasets.save import save_uids
 
 _DESCRIPTION = """
 All BraTS mpMRI scans are available as NIfTI files (.nii.gz) and describe
@@ -122,6 +122,7 @@ class BRATS2021MRNestedDatasetInfo(DatasetInfo):
 
 
 BRATS2021_MR_INFO = BRATS2021MRNestedDatasetInfo(
+    name="brats2021_mr",
     tfds_preprocessed_dir=TFDS_MANUAL_DIR / BRATS2021_MR_TFDS_FOLD / "preprocessed",
     image_spacing=(1.0, 1.0, 1.0),
     image_spatial_shape=(179, 219, 155),

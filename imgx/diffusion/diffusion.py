@@ -16,9 +16,7 @@ class Diffusion:
     num_timesteps: int
     noise_fn: Callable[..., jnp.ndarray]
 
-    def sample_noise(
-        self, key: jax.random.KeyArray, shape: Sequence[int], dtype: jnp.dtype
-    ) -> jnp.ndarray:
+    def sample_noise(self, key: jax.Array, shape: Sequence[int], dtype: jnp.dtype) -> jnp.ndarray:
         """Return a noise of the same shape as input.
 
         Define this function to avoid defining randon key.
@@ -121,7 +119,7 @@ class Diffusion:
 
     def sample(
         self,
-        key: jax.random.KeyArray,
+        key: jax.Array,
         model_out: jnp.ndarray,
         x_t: jnp.ndarray,
         t_index: jnp.ndarray,

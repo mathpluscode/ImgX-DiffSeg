@@ -14,8 +14,7 @@ make build_dataset
 ### Description
 
 This data set from [Li et al. 2022](https://zenodo.org/record/7013610#.Y1U95-zMKrM) contains 589
-T2-weighted labeled images which are split into 411, 14, 164 images for training, validation and
-testing respectively.
+T2-weighted labeled images which are split for training, validation and testing respectively.
 
 ### Download and Build
 
@@ -69,7 +68,7 @@ tfds build imgx_datasets/muscle_us
 ### Description
 
 This data set from [Baid et al. 2021](https://arxiv.org/abs/2107.02314) contains 1251 labeled images
-which are split into 938, 13, 300 images for training, validation and testing respectively.
+which are split for training, validation and testing respectively.
 
 ### Download and Build
 

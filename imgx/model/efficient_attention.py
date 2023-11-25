@@ -192,7 +192,7 @@ def dot_product_attention_with_qkv_chunks(
     bias: jnp.ndarrary | None = None,
     mask: jnp.ndarrary | None = None,
     broadcast_dropout: bool = True,
-    dropout_rng: jax.random.PRNGKeyArray | None = None,
+    dropout_rng: jax.Array | None = None,
     dropout_rate: float = 0.0,
     deterministic: bool = False,
     dtype: jnp.dtype | None = None,

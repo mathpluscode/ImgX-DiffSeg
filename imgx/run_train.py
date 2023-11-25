@@ -11,9 +11,9 @@ from flax.training.early_stopping import EarlyStopping
 from omegaconf import DictConfig, OmegaConf
 
 from imgx.config import flatten_dict
-from imgx.diffusion_segmentation.experiment import DiffusionSegmentationExperiment
 from imgx.experiment import Experiment
-from imgx.segmentation.experiment import SegmentationExperiment
+from imgx.task.diffusion_segmentation.experiment import DiffusionSegmentationExperiment
+from imgx.task.segmentation.experiment import SegmentationExperiment
 from imgx.train_state import save_checkpoint
 from imgx_datasets import INFO_MAP
 from imgx_datasets.constant import VALID_SPLIT
@@ -32,26 +32,26 @@ def set_debug_config(config: DictConfig) -> DictConfig:
     """
     # reduce all model size
     # due to the attention, deeper model reduces the memory usage
-    config.task.model.num_channels = (1, 2, 4, 4)
+    config.task.model.num_channels = (1, 1, 1, 4)
 
     # make training shorter
     n_devices = jax.local_device_count()
-    config.data.loader.max_num_samples_per_split = 11
+    config.data.loader.max_num_samples_per_split = 5
     config.data.trainer.batch_size_per_replica = 2
     config.data.trainer.batch_size = n_devices * config.data.trainer.batch_size_per_replica
-    config.data.trainer.max_num_samples = 256
+    config.data.trainer.max_num_samples = 25
 
     # make logging more frequent
     config.logging.log_freq = 1
-    config.logging.save_freq = 4
+    config.logging.save_freq = 2
 
     # stop early
-    config.task.early_stopping.patience = 5
+    config.task.early_stopping.patience = 1
     config.task.early_stopping.min_delta = 0.1
     return config
 
 
-def process_config(config: DictConfig) -> DictConfig:
+def process_config(config: DictConfig) -> tuple[DictConfig, list[str]]:
     """Modify attributes based on config.
 
     Args:
@@ -59,6 +59,7 @@ def process_config(config: DictConfig) -> DictConfig:
 
     Returns:
         modified config.
+        tags for logging.
     """
     if config.data.trainer.num_devices_per_replica != 1:
         raise ValueError("Distributed training not supported.")
@@ -73,6 +74,10 @@ def process_config(config: DictConfig) -> DictConfig:
         # as by default model is 3D
         config.task.model.num_spatial_dims = dataset_info.ndim
 
+    # overwrite patch size and scale factor
+    config.task.model.patch_size = config.data.patch_size
+    config.task.model.scale_factor = config.data.scale_factor
+
     # set model output channels
     out_channels = dataset_info.num_classes
     if config.task.name == "diffusion_segmentation":
@@ -83,7 +88,16 @@ def process_config(config: DictConfig) -> DictConfig:
             out_channels *= 2
     config.task.model.out_channels = out_channels
 
-    return config
+    # get tags for logging
+    tags = [config.data.name, config.task.name]
+    if config.debug:
+        tags.append("debug")
+    if config.task.name == "diffusion_segmentation":
+        if config.task.recycling.use:
+            tags.append("recycling")
+        if config.task.self_conditioning.use:
+            tags.append("self_conditioning")
+    return config, tags
 
 
 def get_batch_size_per_step(config: DictConfig) -> int:
@@ -132,95 +146,109 @@ def main(  # pylint:disable=too-many-statements
     # update config
     if config.debug:
         config = set_debug_config(config)
-    config = process_config(config)
+    config, tags = process_config(config)
     logging.info(OmegaConf.to_yaml(config))
 
     # init wandb
-    wandb_run = wandb.init(
+    settings = None
+    if config.logging.root_dir:
+        root_dir = Path(config.logging.root_dir).resolve()
+        root_dir.mkdir(parents=True, exist_ok=True)
+        settings = wandb.Settings(root_dir=root_dir)
+    with wandb.init(
         project=config.logging.wandb.project,
         entity=config.logging.wandb.entity,
         config=flatten_dict(dict(config)),
-    )
-    files_dir = Path(wandb_run.settings.files_dir)
-    # backup config
-    OmegaConf.save(config=config, f=files_dir / "config_backup.yaml")
-    ckpt_dir = files_dir / "ckpt"
+        tags=tags,
+        settings=settings,
+    ) as wandb_run:
+        files_dir = Path(wandb_run.settings.files_dir)
+        logging.info(f"Logging to {files_dir}.")
+        # backup config
+        OmegaConf.save(config=config, f=files_dir / "config_backup.yaml")
+        ckpt_dir = files_dir / "ckpt"
 
-    # init model
-    run = build_experiment(config=config)
-    train_state, step_offset = run.train_init()
-    key = jax.random.PRNGKey(config.seed)
-    key = common_utils.shard_prng_key(key)  # each replica has a different key
+        # init model
+        run = build_experiment(config=config)
+        train_state, step_offset = run.train_init()
+        key = jax.random.PRNGKey(config.seed)
+        key = common_utils.shard_prng_key(key)  # each replica has a different key
 
-    logging.info(
-        f"Start training with early stopping on {config.task.early_stopping.metric} "
-        f"and patience = {config.task.early_stopping.patience}."
-    )
-    batch_size_per_step = get_batch_size_per_step(config)
-    max_num_steps = config.data.trainer.max_num_samples // batch_size_per_step
-    early_stop = EarlyStopping(
-        min_delta=config.task.early_stopping.min_delta, patience=config.task.early_stopping.patience
-    )
-    for i in range(1 + step_offset, 1 + max_num_steps):
-        train_state, key, train_metrics = run.train_step(train_state, key)
-        train_metrics = {"train_" + k: v for k, v in train_metrics.items()}
-        metrics = {
-            "num_samples": i * batch_size_per_step,
-            **train_metrics,
-        }
-
-        # save checkpoint if needed
-        to_save_ckpt = (i > 0) and ((i % config.logging.save_freq == 0) or (i == max_num_steps))
-        if to_save_ckpt:
-            ckpt_path = save_checkpoint(
-                train_state=train_state,
-                ckpt_dir=ckpt_dir,
-                # when early stop, it's patience+1 ckpt
-                keep=config.task.early_stopping.patience + 1,
-            )
-            key, val_metrics = run.eval_step(train_state=train_state, key=key, split=VALID_SPLIT)
-            out_dir = Path(ckpt_path)
-            if config.task.name == "diffusion_segmentation":
-                out_dir = out_dir / config.task.sampler.name
-                out_dir.mkdir(parents=True, exist_ok=True)
-            with open(out_dir / "mean_metrics.json", "w", encoding="utf-8") as f:
-                json.dump(val_metrics, f, sort_keys=True, indent=4)
-
-            # update early stopping
-            early_stop_metric = val_metrics[config.task.early_stopping.metric]
-            if config.task.early_stopping.mode == "max":
-                early_stop_metric = -early_stop_metric
-            _, early_stop = early_stop.update(early_stop_metric)
-            logging.info(
-                f"Early stop updated {i}: "
-                f"should_stop={early_stop.should_stop}, "
-                f"best_metric({config.task.early_stopping.metric})={early_stop.best_metric:.4f}, "
-                f"patience_count={early_stop.patience_count}, "
-                f"min_delta={early_stop.min_delta}, "
-                f"patience={early_stop.patience}."
-            )
-
-            # update metrics
-            # only add prefix after saving to json
-            val_metrics = {"valid_" + k: v for k, v in val_metrics.items()}
+        logging.info(
+            f"Start training with early stopping on {config.task.early_stopping.metric} "
+            f"and patience = {config.task.early_stopping.patience}."
+        )
+        batch_size_per_step = get_batch_size_per_step(config)
+        max_num_steps = config.data.trainer.max_num_samples // batch_size_per_step
+        early_stop = EarlyStopping(
+            min_delta=config.task.early_stopping.min_delta,
+            patience=config.task.early_stopping.patience,
+        )
+        for i in range(1 + step_offset, 1 + max_num_steps):
+            train_state, key, train_metrics = run.train_step(train_state, key)
+            train_metrics = {"train_" + k: v for k, v in train_metrics.items()}
             metrics = {
-                **metrics,
-                **val_metrics,
+                "num_samples": i * batch_size_per_step,
+                **train_metrics,
             }
-            metrics_str = {k: v if isinstance(v, int) else f"{v:.2e}" for k, v in metrics.items()}
-            logging.info(f"Batch {i}: {metrics_str}")
 
-        # log metrics
-        if config.logging.wandb.project and (i % config.logging.log_freq == 0):
-            wandb.log(metrics)
+            # save checkpoint if needed
+            to_save_ckpt = (i > 0) and ((i % config.logging.save_freq == 0) or (i == max_num_steps))
+            if to_save_ckpt:
+                ckpt_path = save_checkpoint(
+                    train_state=train_state,
+                    ckpt_dir=ckpt_dir,
+                    # when early stop, it's patience+1 ckpt
+                    keep=config.task.early_stopping.patience + 1,
+                )
+                key, val_metrics = run.eval_step(
+                    train_state=train_state, key=key, split=VALID_SPLIT
+                )
+                out_dir = Path(ckpt_path)
+                if config.task.name == "diffusion_segmentation":
+                    out_dir = out_dir / config.task.sampler.name
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                with open(out_dir / "mean_metrics.json", "w", encoding="utf-8") as f:
+                    json.dump(val_metrics, f, sort_keys=True, indent=4)
 
-        # early stopping
-        if early_stop.should_stop:
-            logging.info(
-                f"Met early stopping criteria with {config.task.early_stopping.metric} = "
-                f"{early_stop.best_metric} and patience {early_stop.patience_count}, breaking..."
-            )
-            break
+                # update early stopping
+                early_stop_metric = val_metrics[config.task.early_stopping.metric]
+                if config.task.early_stopping.mode == "max":
+                    early_stop_metric = -early_stop_metric
+                early_stop = early_stop.update(early_stop_metric)
+                logging.info(
+                    f"Early stop updated {i}: "
+                    f"should_stop={early_stop.should_stop}, "
+                    f"best_metric({config.task.early_stopping.metric})"
+                    f"={early_stop.best_metric:.4f}, "
+                    f"patience_count={early_stop.patience_count}, "
+                    f"min_delta={early_stop.min_delta}, "
+                    f"patience={early_stop.patience}."
+                )
+
+                # update metrics
+                # only add prefix after saving to json
+                val_metrics = {"valid_" + k: v for k, v in val_metrics.items()}
+                metrics = {
+                    **metrics,
+                    **val_metrics,
+                }
+                metrics_str = {
+                    k: v if isinstance(v, int) else f"{v:.2e}" for k, v in metrics.items()
+                }
+                logging.info(f"Batch {i}: {metrics_str}")
+
+            # log metrics
+            if config.logging.wandb.project and (i % config.logging.log_freq == 0):
+                wandb.log(metrics)
+
+            # early stopping
+            if early_stop.should_stop:
+                logging.info(
+                    f"Met early stopping criteria with {config.task.early_stopping.metric} = "
+                    f"{early_stop.best_metric} and patience {early_stop.patience_count}, breaking."
+                )
+                break
 
 
 if __name__ == "__main__":

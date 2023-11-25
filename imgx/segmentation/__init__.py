@@ -1,1 +1,0 @@
-"""Segmentation task."""

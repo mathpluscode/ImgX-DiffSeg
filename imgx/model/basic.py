@@ -1,64 +1,18 @@
 """Basic functions and modules."""
 from __future__ import annotations
 
-from collections.abc import Sequence
-from functools import partial
 from typing import Callable
 
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
 
-# flax LayerNorm differs from haiku
-LayerNorm = partial(
-    nn.LayerNorm,
-    epsilon=1e-5,
-    use_fast_variance=False,
-)
-
-
-def truncated_normal(
-    stddev: float | jnp.ndarray = 1.0,
-    mean: float | jnp.ndarray = 0.0,
-    dtype: jnp.dtype = jnp.float_,
-) -> Callable[[jax.random.PRNGKeyArray, jnp.shape, jnp.dtype], jnp.ndarray]:
-    """Truncated normal initializer as in haiku.
-
-    Args:
-        stddev: standard deviation of the truncated normal distribution.
-        mean: mean of the truncated normal distribution.
-        dtype: dtype of the array.
-
-    Returns:
-        Initializer function.
-    """
-
-    def init(
-        key: jax.random.KeyArray, shape: Sequence[int], dtype: jnp.dtype = dtype
-    ) -> jnp.ndarray:
-        """Init function.
-
-        Args:
-            key: random key.
-            shape: shape of the array.
-            dtype: dtype of the array.
-        """
-        real_dtype = jnp.finfo(dtype).dtype
-        m = jax.lax.convert_element_type(mean, dtype)
-        s = jax.lax.convert_element_type(stddev, real_dtype)
-        is_complex = jnp.issubdtype(dtype, jnp.complexfloating)
-        if is_complex:
-            shape = [2, *shape]
-        unscaled = jax.random.truncated_normal(key, -2.0, 2.0, shape, real_dtype)
-        if is_complex:
-            unscaled = unscaled[0] + 1j * unscaled[1]
-        return s * unscaled + m
-
-    return init
-
 
 class InstanceNorm(nn.Module):
-    """Instance norm."""
+    """Instance norm.
+
+    The norm is calculated on axes excluding batch and features.
+    """
 
     dtype: jnp.dtype = jnp.float32
 
@@ -67,13 +21,13 @@ class InstanceNorm(nn.Module):
         """Forward pass.
 
         Args:
-            x: input with batch axis, (batch, ...).
+            x: input with batch axis, (batch, ..., channel).
 
         Returns:
             Normalised input.
         """
         reduction_axes = tuple(range(x.ndim)[slice(1, -1)])
-        return LayerNorm(
+        return nn.LayerNorm(
             reduction_axes=reduction_axes,
         )(x)
 
@@ -121,7 +75,7 @@ class MLP(nn.Module):
     output_size: int
     activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.gelu
     kernel_init: Callable[
-        [jax.random.PRNGKeyArray, jnp.shape, jnp.dtype], jnp.ndarray
+        [jax.Array, jnp.shape, jnp.dtype], jnp.ndarray
     ] = nn.initializers.lecun_normal()
     dtype: jnp.dtype = jnp.float32
 

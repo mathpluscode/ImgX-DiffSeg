@@ -10,64 +10,66 @@ import SimpleITK as sitk  # noqa: N813
 from imgx_datasets.util import get_center_crop_shape_from_bbox, get_center_pad_shape
 
 
-def check_image_and_label(
-    image_volume: sitk.Image,
-    label_volume: sitk.Image,
-    image_path: Path,
-    label_path: Path,
+def compare_volume_metadata(
+    volume1: sitk.Image,
+    volume2: sitk.Image,
+    path1: Path,
+    path2: Path,
     rtol: float = 1.0e-5,
     atol: float = 1.0e-3,
 ) -> None:
-    """Check if metadata matches between image and label.
+    """Check if metadata matches between images.
+
+    Image can also be labels.
 
     Args:
-        image_volume: loaded image.
-        label_volume: loaded label.
-        image_path: image file path.
-        label_path: label file path.
+        volume1: image volume 1.
+        volume2: image volume 2.
+        path1: file path 1, for error message.
+        path2: file path 2, for error message.
         rtol: relative tolerance for sanity check, 1E-5 is too big.
         atol: absolute tolerance for sanity check, 1E-8 is too big.
 
     Raises:
-        ValueError: if image and label metadata does not match
+        ValueError: metadata does not match
     """
-    if image_volume.GetSize() != label_volume.GetSize():
+    if volume1.GetSize() != volume2.GetSize():
         raise ValueError(
-            f"Image and label sizes are not the same for "
-            f"{image_path} and {label_path}: "
-            f"{image_volume.GetSize()} and {label_volume.GetSize()}."
+            f"Sizes are not the same for "
+            f"{path1} and {path2}: "
+            f"{volume1.GetSize()} and {volume2.GetSize()}."
         )
     if not np.allclose(
-        image_volume.GetSpacing(),
-        label_volume.GetSpacing(),
+        volume1.GetSpacing(),
+        volume2.GetSpacing(),
         rtol=rtol,
         atol=atol,
     ):
         raise ValueError(
-            f"Image and label spacing are not the same for "
-            f"{image_path} and {label_path}: "
-            f"{image_volume.GetSpacing()} and {label_volume.GetSpacing()}."
+            f"Spacing are not the same for "
+            f"{path1} and {path2}: "
+            f"{volume1.GetSpacing()} and {volume2.GetSpacing()}."
         )
     if not np.allclose(
-        image_volume.GetDirection(),
-        label_volume.GetDirection(),
+        volume1.GetDirection(),
+        volume2.GetDirection(),
         rtol=rtol,
         atol=atol,
     ):
-        arr_image = np.array(image_volume.GetDirection())
-        arr_label = np.array(label_volume.GetDirection())
+        arr_image = np.array(volume1.GetDirection())
+        arr_label = np.array(volume2.GetDirection())
         raise ValueError(
-            f"Image and label direction are not the same for "
-            f"{image_path} and {label_path}: "
+            f"Direction are not the same for "
+            f"{path1} and {path2}: "
             f"{arr_image} and {arr_label}, "
             f"difference is {arr_image - arr_label} for "
             f"rtol={rtol} and atol = {atol}."
         )
-    if not np.allclose(image_volume.GetOrigin(), label_volume.GetOrigin(), rtol=rtol, atol=atol):
+    if not np.allclose(volume1.GetOrigin(), volume2.GetOrigin(), rtol=rtol, atol=atol):
         raise ValueError(
-            f"Image and label origin are not the same for "
-            f"{image_path} and {label_path}: "
-            f"{image_volume.GetOrigin()} and {label_volume.GetOrigin()}."
+            f"Origin are not close for "
+            f"{path1} and {path2}: "
+            f"{volume1.GetOrigin()} and {volume2.GetOrigin()}."
         )
 
 
@@ -291,11 +293,11 @@ def load_and_preprocess_image_and_label(
     label_volume = sitk.ReadImage(str(label_path))
 
     # metadata should be the same
-    check_image_and_label(
-        image_volume=image_volume,
-        label_volume=label_volume,
-        image_path=image_path,
-        label_path=label_path,
+    compare_volume_metadata(
+        volume1=image_volume,
+        volume2=label_volume,
+        path1=image_path,
+        path2=label_path,
     )
 
     # resample
@@ -355,6 +357,7 @@ def load_and_preprocess_image_and_label(
         )
 
     # save processed image/mask
+    out_dir.mkdir(parents=True, exist_ok=True)
     image_out_path = out_dir / (uid + "_img_preprocessed.nii.gz")
     label_out_path = out_dir / (uid + "_mask_preprocessed.nii.gz")
     sitk.WriteImage(image=image_volume, fileName=str(image_out_path), useCompression=True)

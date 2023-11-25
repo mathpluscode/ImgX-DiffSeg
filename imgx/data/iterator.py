@@ -8,20 +8,23 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import jax.scipy
+import numpy as np
 import tensorflow as tf
+import tensorflow.experimental.numpy as tnp
 import tensorflow_datasets as tfds
 from absl import logging
 from omegaconf import DictConfig
 
 from imgx.data.util import get_foreground_range, maybe_pad_batch, tf_to_numpy
 from imgx.device import shard
-from imgx.optim import get_half_precision_dtype
+from imgx.train_state import get_half_precision_dtype
 from imgx_datasets.constant import (
     FOREGROUND_RANGE,
     IMAGE,
     LABEL,
     TEST_SPLIT,
     TRAIN_SPLIT,
+    UID,
     VALID_SPLIT,
 )
 
@@ -39,37 +42,49 @@ DatasetIterator = namedtuple(
 )
 
 
-def create_image_label_dict_from_dict(
-    x: dict[str, tf.Tensor],
+def remove_uid_from_dict(
+    batch: dict[str, tf.Tensor],
 ) -> dict[str, tf.Tensor]:
     """Create a dict from inputs.
 
     Args:
-        x: dict having image, label, and other tensors.
+        batch: dict potentially having uid.
 
     Returns:
-        Dict having image and label.
+        Dict not having uid.
     """
-    return {
-        IMAGE: x[IMAGE],
-        LABEL: x[LABEL],
-    }
+    return {k: v for k, v in batch.items() if k != UID}
 
 
-def add_foreground_range_in_dict(
-    x: dict[str, tf.Tensor],
+def add_foreground_range(
+    batch: dict[str, tf.Tensor],
 ) -> dict[str, tf.Tensor]:
-    """Add FOREGROUND_RANGE in input dict.
+    """Add FOREGROUND_RANGE in input dict if there are labels.
 
     Args:
-        x: dict having some attributes.
+        batch: dict maybe having label.
 
     Returns:
-        Dict having FOREGROUND_RANGE.
+        Dict having FOREGROUND_RANGE of shape (ndim, 2).
     """
+    foreground_ranges = []
+    for k, v in batch.items():
+        if LABEL in k:
+            # (ndim, 2)
+            foreground_ranges.append(get_foreground_range(v))
+    if len(foreground_ranges) == 0:
+        # no labels
+        return batch
+    # (num_labels, ndim, 2)
+    foreground_range = tnp.stack(foreground_ranges, axis=0)
+    # (ndim, 2)
+    foreground_range = tnp.stack(
+        [tnp.min(foreground_range[:, :, 0], axis=0), tnp.max(foreground_range[:, :, 1], axis=0)],
+        axis=-1,
+    )
     return {
-        FOREGROUND_RANGE: get_foreground_range(x[LABEL]),
-        **x,
+        FOREGROUND_RANGE: foreground_range,
+        **batch,
     }
 
 
@@ -101,47 +116,45 @@ def load_split_from_image_tfds_builder(
           returns -1 for training.
     """
     is_train = split == TRAIN_SPLIT
-    # Prepare arguments.
     shuffle_buffer_size = shuffle_buffer_size or (8 * batch_size)
 
-    # Download data.
+    # download data
     builder.download_and_prepare()
 
-    # Each host is responsible for a fixed subset of data.
+    # each host is responsible for a fixed subset of data
     if is_train:
         split = tfds.even_splits(split, jax.process_count())[jax.process_index()]
     dataset = builder.as_dataset(
         split=split,
     )
 
-    # Shrink data set if required
+    # shrink data set if required
     if max_num_samples > 0:
         logging.info(f"Taking first {max_num_samples} data samples for split {split}.")
         dataset = dataset.take(max_num_samples)
 
-    # Caching.
+    # caching
     dataset = dataset.cache()
 
     num_steps = -1  # not set for training
     if is_train:
-        # First repeat then batch.
+        # first repeat then batch
         dataset = dataset.repeat()
-        # Augmentation should be done after repeat for true randomness.
+        # augmentation should be done after repeat for true randomness
         # remove uid and calculate foreground range (deterministic)
         dataset = dataset.map(
-            create_image_label_dict_from_dict,
+            remove_uid_from_dict,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
         dataset = dataset.map(
-            add_foreground_range_in_dict,
+            add_foreground_range,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
-        # Shuffle after augmentation to avoid loading non-augmented images into
-        # buffer.
+        # shuffle after augmentation to avoid loading non-augmented images into buffer
         dataset = dataset.shuffle(shuffle_buffer_size, seed=shuffle_seed)
         dataset = dataset.batch(batch_size, drop_remainder=True)
     else:
-        # First batch then repeat.
+        # first batch then repeat
         dataset = dataset.batch(batch_size, drop_remainder=False)
         num_steps = tf.data.experimental.cardinality(dataset).numpy()
         if split == VALID_SPLIT:
@@ -154,7 +167,9 @@ def load_split_from_image_tfds_builder(
     if dtype != jnp.float32:
 
         def cast_fn(batch: dict[str, jnp.ndarray]) -> dict[str, jnp.ndarray]:
-            batch[IMAGE] = tf.cast(batch[IMAGE], tf.dtypes.as_dtype(dtype))
+            for k in batch:
+                if IMAGE in k:
+                    batch[k] = tf.cast(batch[k], tf.dtypes.as_dtype(dtype))
             return batch
 
         dataset = dataset.map(cast_fn)
@@ -173,7 +188,7 @@ def get_image_iterator(
     shuffle_seed: int,
     max_num_samples: int,
     dtype: jnp.dtype = jnp.float32,
-) -> tuple[Iterator, int]:
+) -> tuple[Iterator[dict[str, np.ndarray]], int]:
     """Returns iterator from builder.
 
     Args:
@@ -216,8 +231,6 @@ def get_image_tfds_dataset(
     config: DictConfig,
 ) -> DatasetIterator:
     """Returns generators for the dataset train, valid, and test sets.
-
-    TODO: not necessary to init all iterators at once.
 
     Args:
         dataset_name: Data set name.

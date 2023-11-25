@@ -1,50 +1,49 @@
 """Script for image patching."""
+from __future__ import annotations
+
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 from omegaconf import DictConfig
 
+from imgx.data import AugmentationFn
+from imgx.data.util import get_batch_size
 from imgx_datasets import INFO_MAP
 from imgx_datasets.constant import IMAGE, LABEL
 
 
 def batch_patch_random_sample(
-    key: jax.random.PRNGKeyArray,
+    key: jax.Array,
     batch: dict[str, jnp.ndarray],
-    image_shape: jnp.ndarray,
-    patch_shape: jnp.ndarray,
+    image_shape: tuple[int, ...],
+    patch_shape: tuple[int, ...],
 ) -> dict[str, jnp.ndarray]:
     """Randomly crop patch from image and label.
 
     The crop per sample in the batch is different.
     Image and label have no channel dimension.
 
+    The crop in each sample is the same.
+
     Args:
         key: jax random key.
-        batch: dict having image and label.
-            image may have shape (batch, d1, ..., dn) or (batch, d1, ..., dn, c)
-            label has shape (batch, d1, ..., dn)
+        batch: dict having images or labels, and foreground_range.
+            images have shape (batch, d1, ..., dn) or (batch, d1, ..., dn, c)
+            labels have shape (batch, d1, ..., dn)
+            batch should not have other keys such as UID.
         image_shape: image spatial shape, (d1, ..., dn).
-        patch_shape: patch size, shape = (p1, ..., pn),
+        patch_shape: patch size shape, (p1, ..., pn),
             patch_shape should <= image_shape for all dimensions.
 
     Returns:
         Augmented dict having image and label.
         image and label all have shapes (batch, p1, ..., pn).
     """
-    image = batch[IMAGE]
-    label = batch[LABEL]
-
-    # check shapes
-    if image.ndim not in [label.ndim, label.ndim + 1]:
-        raise ValueError(
-            f"image and label must have same ndim or ndim+1, "
-            f"got {image.ndim} and {label.ndim} "
-            f"for image and label, correspondingly."
-        )
+    batch_size = get_batch_size(batch)
 
     # define sample range
-    batch_size = image.shape[0]
     indice_range = jnp.array(image_shape) - jnp.array(patch_shape)
 
     # sample a corner for each sample in the batch
@@ -70,34 +69,44 @@ def batch_patch_random_sample(
         return jax.lax.dynamic_slice(x, start_indices_i, patch_shape)
 
     # crop patch
-    # vmap on batch axis
-    slice_image_vmap = jax.vmap(
-        slice_per_sample,
-        in_axes=(0, 0),
-    )
-    if image.ndim == label.ndim + 1:
-        # vmap on channel axis
-        ch_axis = image.ndim - 1
-        slice_image_vmap = jax.vmap(
-            slice_image_vmap,
-            in_axes=(ch_axis, None),
-            out_axes=ch_axis,
-        )
-    # (batch, p1, ..., pn) or (batch, p1, ..., pn, c)
-    image = slice_image_vmap(image, start_indices)
-    # vmap on batch axis
-    # (batch, p1, ..., pn)
-    label = jax.vmap(
-        slice_per_sample,
-        in_axes=(0, 0),
-    )(label, start_indices)
-    return {IMAGE: image, LABEL: label}
+    cropped_batch = {}
+    for k, v in batch.items():
+        if LABEL in k:
+            # assume label related keys have label in name
+            # vmap on batch axis
+            # (batch, p1, ..., pn)
+            if v.ndim != len(image_shape) + 1:
+                raise ValueError(f"Label {k} has wrong ndim {v.ndim}.")
+            cropped_batch[k] = jax.vmap(
+                slice_per_sample,
+                in_axes=(0, 0),
+            )(v, start_indices)
+        elif IMAGE in k:
+            # assume image related keys have image in name
+            if v.ndim not in [len(image_shape) + 1, len(image_shape) + 2]:
+                raise ValueError(f"Image {k} has wrong ndim {v.ndim}.")
+            # vmap on batch axis
+            slice_image_vmap = jax.vmap(
+                slice_per_sample,
+                in_axes=(0, 0),
+            )
+            if v.ndim == len(image_shape) + 2:
+                # vmap on channel axis
+                ch_axis = len(image_shape) + 1
+                slice_image_vmap = jax.vmap(
+                    slice_image_vmap,
+                    in_axes=(ch_axis, None),
+                    out_axes=ch_axis,
+                )
+            # (batch, p1, ..., pn) or (batch, p1, ..., pn, c)
+            cropped_batch[k] = slice_image_vmap(v, start_indices)
+    return cropped_batch
 
 
 def get_patch_grid(
-    image_shape: tuple,
-    patch_shape: tuple,
-    patch_overlap: tuple,
+    image_shape: tuple[int, ...],
+    patch_shape: tuple[int, ...],
+    patch_overlap: tuple[int, ...],
 ) -> np.ndarray:
     """Get start_indices per patch following a grid.
 
@@ -135,7 +144,7 @@ def get_patch_grid(
 def batch_patch_grid_sample(
     x: jnp.ndarray,
     start_indices: np.ndarray,
-    patch_shape: tuple,
+    patch_shape: tuple[int, ...],
 ) -> jnp.ndarray:
     """Extract patch following a grid.
 
@@ -149,6 +158,8 @@ def batch_patch_grid_sample(
         Patched, has shapes (batch, num_patches, p1, ..., pn)
             or (batch, num_patches, p1, ..., pn, c).
     """
+    if x.ndim not in [len(patch_shape) + 1, len(patch_shape) + 2]:
+        raise ValueError(f"Image has wrong ndim {x.ndim}.")
 
     def slice_per_sample(
         x: jnp.ndarray,
@@ -235,7 +246,7 @@ def add_patch_with_channel(
 def batch_patch_grid_mean_aggregate(
     x_patch: jnp.ndarray,
     start_indices: np.ndarray,
-    image_shape: tuple,
+    image_shape: tuple[int, ...],
 ) -> jnp.ndarray:
     """Aggregate patches by average on overlapping area following a grid.
 
@@ -314,3 +325,27 @@ def get_patch_shape_grid_from_config(
         patch_overlap=patch_overlap,
     )
     return patch_shape, patch_start_indices
+
+
+def get_random_patch_fn(
+    config: DictConfig,
+) -> AugmentationFn:
+    """Return a data augmentation function for patching.
+
+    Args:
+        config: entire config.
+
+    Returns:
+        A data augmentation function.
+    """
+    dataset_info = INFO_MAP[config.data.name]
+    image_shape = dataset_info.image_spatial_shape
+    patch_shape = config.data.loader.patch_shape
+    if all(i <= j for i, j in zip(image_shape, patch_shape)):
+        # no need to patch
+        return lambda _, batch: batch
+    return partial(
+        batch_patch_random_sample,
+        image_shape=image_shape,
+        patch_shape=patch_shape,
+    )

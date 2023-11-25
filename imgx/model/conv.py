@@ -1,10 +1,6 @@
-"""Module for convolution layers.
-
-The kernel initialisation follows haiku's default.
-"""
+"""Module for convolution layers."""
 from __future__ import annotations
 
-from functools import partial
 from typing import Callable
 
 import flax.linen as nn
@@ -12,26 +8,6 @@ import jax
 import jax.numpy as jnp
 
 from imgx.model.basic import InstanceNorm
-
-# flax variance_scaling normalizes the std with the constant
-# stddev = jnp.sqrt(variance) / jnp.array(.87962566103423978, dtype)
-# this is different from haiku
-Conv = partial(
-    nn.Conv,
-    kernel_init=nn.initializers.variance_scaling(
-        scale=0.87962566103423978**2,
-        mode="fan_in",
-        distribution="truncated_normal",
-    ),
-)
-ConvTranspose = partial(
-    nn.ConvTranspose,
-    kernel_init=nn.initializers.variance_scaling(
-        scale=0.87962566103423978**2,
-        mode="fan_in",
-        distribution="truncated_normal",
-    ),
-)
 
 
 class ConvNormAct(nn.Module):
@@ -58,7 +34,7 @@ class ConvNormAct(nn.Module):
         """
         return nn.Sequential(
             [
-                Conv(
+                nn.Conv(
                     features=self.out_channels,
                     kernel_size=(self.kernel_size,) * self.num_spatial_dims,
                     use_bias=False,
@@ -93,7 +69,7 @@ class ConvResBlockWithoutTime(nn.Module):
             Array.
         """
         res = x
-        x = Conv(
+        x = nn.Conv(
             features=self.out_channels,
             kernel_size=(self.kernel_size,) * self.num_spatial_dims,
             use_bias=False,
@@ -101,7 +77,7 @@ class ConvResBlockWithoutTime(nn.Module):
         )(x)
         x = InstanceNorm(dtype=self.dtype)(x)
         x = self.activation(x)
-        x = Conv(
+        x = nn.Conv(
             features=self.out_channels,
             kernel_size=(self.kernel_size,) * self.num_spatial_dims,
             use_bias=False,
@@ -144,7 +120,7 @@ class ConvResBlockWithTime(nn.Module):
         t_emb = nn.Dense(self.out_channels, dtype=self.dtype)(t_emb)
 
         res = x
-        x = Conv(
+        x = nn.Conv(
             features=self.out_channels,
             kernel_size=(self.kernel_size,) * self.num_spatial_dims,
             use_bias=False,
@@ -152,7 +128,7 @@ class ConvResBlockWithTime(nn.Module):
         )(x)
         x = InstanceNorm(dtype=self.dtype)(x)
         x = self.activation(x)
-        x = Conv(
+        x = nn.Conv(
             features=self.out_channels,
             kernel_size=(self.kernel_size,) * self.num_spatial_dims,
             use_bias=False,
@@ -213,9 +189,8 @@ class ConvResBlock(nn.Module):
 class ConvDownSample(nn.Module):
     """Down-sample with Conv."""
 
-    num_spatial_dims: int
     out_channels: int
-    scale_factor: int
+    scale_factor: tuple[int, ...]
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
@@ -234,10 +209,10 @@ class ConvDownSample(nn.Module):
         """
         return nn.Sequential(
             [
-                Conv(
+                nn.Conv(
                     features=self.out_channels,
-                    kernel_size=(self.scale_factor,) * self.num_spatial_dims,
-                    strides=(self.scale_factor,) * self.num_spatial_dims,
+                    kernel_size=self.scale_factor,
+                    strides=self.scale_factor,
                     use_bias=False,
                     dtype=self.dtype,
                 ),
@@ -249,9 +224,8 @@ class ConvDownSample(nn.Module):
 class ConvUpSample(nn.Module):
     """Up-sample with ConvTranspose."""
 
-    num_spatial_dims: int
     out_channels: int
-    scale_factor: int
+    scale_factor: tuple[int, ...]
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
@@ -270,10 +244,10 @@ class ConvUpSample(nn.Module):
         """
         return nn.Sequential(
             [
-                ConvTranspose(
+                nn.ConvTranspose(
                     features=self.out_channels,
-                    kernel_size=(self.scale_factor,) * self.num_spatial_dims,
-                    strides=(self.scale_factor,) * self.num_spatial_dims,
+                    kernel_size=self.scale_factor,
+                    strides=self.scale_factor,
                     use_bias=False,
                     dtype=self.dtype,
                 ),
