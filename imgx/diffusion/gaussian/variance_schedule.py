@@ -107,6 +107,8 @@ def downsample_beta_schedule(
 
     After down-sampling, the first and last values of alphas_cumprod are kept.
 
+    https://arxiv.org/abs/2102.09672
+
     Args:
         betas: beta schedule, shape (num_timesteps,).
             Values are in ascending order.
