@@ -20,8 +20,9 @@ applications.** :construction:
     - Added `patch_size` and `scale_factor` to data config.
     - Moved loss config from the main config to task config.
   - Refactored code, including defining `imgx/task` submodule.
-- October 2023: :sunglasses: Migrated from [Haiku](https://github.com/google-deepmind/dm-haiku) to
-  [Flax](https://github.com/google/flax) following Google DeepMind's recommendation.
+- October 2023:
+  - :blush: Migrated from [Haiku](https://github.com/google-deepmind/dm-haiku) to
+    [Flax](https://github.com/google/flax) following Google DeepMind's recommendation.
 
 :mailbox: Please feel free to
 [create an issue](https://github.com/mathpluscode/ImgX-DiffSeg/issues/new/choose) to request
