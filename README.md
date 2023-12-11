@@ -4,7 +4,7 @@ ImgX-DiffSeg is a Jax-based deep learning toolkit using Flax for biomedical imag
 
 This repository includes the implementation of the following work
 
-- [A Recycling Training Strategy for Medical Image Segmentation with Diffusion Denoising Models](https://arxiv.org/abs/2308.16355)
+- [A Recycling Training Strategy for Medical Image Segmentation with Diffusion Denoising Models](https://melba-journal.org/2023:016)
 - [Importance of Aligning Training Strategy with Evaluation for Diffusion Models in 3D Multiclass Segmentation](https://arxiv.org/abs/2303.06040)
 
 :construction: **The codebase is still under active development for more enhancements and
@@ -29,7 +29,7 @@ applications.** :construction:
 features or [reach out](https://orcid.org/0000-0002-1184-7421) for collaborations. :mailbox:
 
 <div>
-<img src="images/diffusion_training_strategy_diagram.png" width="600" alt="diffusion_training_strategy_diagram"></img>
+<img src="images/melba_graphic_abstract.png" width="600" alt="graphic_abstract"></img>
 </div>
 
 ## Features
@@ -54,7 +54,7 @@ See the [readme](imgx_datasets/README.md) for further details.
     prediction ([x0-parameterization](https://arxiv.org/abs/2102.09672)).
   - [Importance sampling](https://arxiv.org/abs/2102.09672) for timestep.
   - Recycling training strategies, including [xt-recycling](https://arxiv.org/abs/2303.06040) and
-    [xT-recycling](https://arxiv.org/abs/2308.16355).
+    [xT-recycling](https://melba-journal.org/2023:016).
   - Self-conditioning training strategies, including
     [Chen et al. 2022](https://arxiv.org/abs/2208.04202) and
     [Watson et al. 2023.](https://www.nature.com/articles/s41586-023-06415-8).
@@ -311,13 +311,17 @@ London and the University of Manchester, and Cloud TPUs from Google's TPU Resear
 If you find the code base and method useful in your research, please cite the relevant paper:
 
 ```bibtex
-@article{fu2023recycling,
-  title={A Recycling Training Strategy for Medical Image Segmentation with Diffusion Denoising Models},
-  author={Fu, Yunguan and Li, Yiwen and Saeed, Shaheer U and Clarkson, Matthew J and Hu, Yipeng},
-  journal={arXiv preprint arXiv:2308.16355},
-  year={2023},
-  doi={10.48550/arXiv.2308.16355},
-  url={https://arxiv.org/abs/2308.16355},
+@article{melba:2023:016:fu,
+    title = "A Recycling Training Strategy for Medical Image Segmentation with Diffusion Denoising Models",
+    author = "Fu, Yunguan and Li, Yiwen and Saeed, Shaheer U. and Clarkson, Matthew J. and Hu, Yipeng",
+    journal = "Machine Learning for Biomedical Imaging",
+    volume = "2",
+    issue = "Special Issue for Generative Models",
+    year = "2023",
+    pages = "507--546",
+    issn = "2766-905X",
+    doi = "https://doi.org/10.59275/j.melba.2023-fbe4",
+    url = "https://melba-journal.org/2023:016"
 }
 
 @article{fu2023importance,
