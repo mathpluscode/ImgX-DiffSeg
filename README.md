@@ -192,12 +192,30 @@ make pip
 
 ## Build Data Sets
 
+:warning: For using your own data set, the following steps are not needed. Please check the
+[existing datasets](https://github.com/mathpluscode/ImgX-DiffSeg/blob/main/imgx_datasets/) for
+examples of using TFDS. Particularly,
+[BraTS 2021](https://github.com/mathpluscode/ImgX-DiffSeg/blob/main/imgx_datasets/brats2021_mr/brats2021_mr_dataset_builder.py)
+does not require downloading.
+
+:muscle: We are working on a toy example for using custom data sets without TFDS, thanks for your
+understanding.
+
 Use the following commands to (re)build all data sets. Check the [README](imgx_datasets/README.md)
 of imgx_datasets for details. Especially, manual downloading is required for the BraTS 2021 dataset.
 
 ```bash
 make build_dataset
 make rebuild_dataset
+```
+
+Or build the selected data set by running one of the following commands.
+
+```bash
+tfds build imgx_datasets/male_pelvic_mr
+tfds build imgx_datasets/amos_ct
+tfds build imgx_datasets/muscle_us
+tfds build imgx_datasets/brats2021_mr  # requires downloading data manually
 ```
 
 ## Experiment

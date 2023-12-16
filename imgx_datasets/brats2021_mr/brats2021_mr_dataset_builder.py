@@ -302,7 +302,7 @@ class Builder(tfds.core.GeneratorBasedBuilder, skip_registration=True):
         Returns:
             dict mapping split to generators.
         """
-        # Download data from zenodo
+        # Manually downloaded
         data_dir = dl_manager.manual_dir / BRATS2021_MR_TFDS_FOLD / "BraTS2021_Training_Data"
         preprocessed_dir = dl_manager.manual_dir / BRATS2021_MR_TFDS_FOLD / "preprocessed"
         preprocessed_dir.mkdir(parents=True, exist_ok=True)
