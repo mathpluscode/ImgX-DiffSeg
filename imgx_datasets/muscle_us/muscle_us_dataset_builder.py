@@ -1,6 +1,7 @@
 """muscle_us dataset."""
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
 from pathlib import Path
 from typing import ClassVar
@@ -22,6 +23,10 @@ from imgx_datasets.constant import (
 )
 from imgx_datasets.dataset_info import OneHotLabeledDatasetInfo
 from imgx_datasets.save import load_2d_grayscale_image, save_2d_grayscale_image, save_uids
+
+# https://github.com/tensorflow/datasets/issues/2761
+tfds.core.utils.gcs_utils._is_gcs_disabled = True  # pylint: disable=protected-access
+os.environ["NO_GCE_CHECK"] = "true"
 
 _DESCRIPTION = """
 The dataset included 3917 images of biceps brachii, tibialis anterior and

@@ -1,6 +1,7 @@
 """AMOS CT image dataset."""
 
 import json
+import os
 from collections.abc import Generator
 from pathlib import Path
 from typing import ClassVar
@@ -20,6 +21,10 @@ from imgx_datasets.constant import (
 from imgx_datasets.dataset_info import OneHotLabeledDatasetInfo
 from imgx_datasets.preprocess import load_and_preprocess_image_and_label
 from imgx_datasets.save import save_uids
+
+# https://github.com/tensorflow/datasets/issues/2761
+tfds.core.utils.gcs_utils._is_gcs_disabled = True  # pylint: disable=protected-access
+os.environ["NO_GCE_CHECK"] = "true"
 
 _DESCRIPTION = """
 The data set includes 500 CT and 100 MR images from Amos:

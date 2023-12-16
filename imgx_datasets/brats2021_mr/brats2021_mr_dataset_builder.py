@@ -1,6 +1,7 @@
 """brats2021_mr dataset."""
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
 from pathlib import Path
 from typing import ClassVar
@@ -23,6 +24,10 @@ from imgx_datasets.constant import (
 from imgx_datasets.dataset_info import DatasetInfo
 from imgx_datasets.preprocess import clip_and_normalise_intensity
 from imgx_datasets.save import save_uids
+
+# https://github.com/tensorflow/datasets/issues/2761
+tfds.core.utils.gcs_utils._is_gcs_disabled = True  # pylint: disable=protected-access
+os.environ["NO_GCE_CHECK"] = "true"
 
 _DESCRIPTION = """
 All BraTS mpMRI scans are available as NIfTI files (.nii.gz) and describe
