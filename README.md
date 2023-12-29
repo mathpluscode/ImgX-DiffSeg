@@ -1,5 +1,10 @@
 # ImgX-DiffSeg
 
+[![pre-commit](https://github.com/mathpluscode/ImgX-DiffSeg/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/mathpluscode/ImgX-DiffSeg/actions/workflows/pre-commit.yml)
+[![unit-test](https://github.com/mathpluscode/ImgX-DiffSeg/actions/workflows/unit-test.yml/badge.svg)](https://github.com/mathpluscode/ImgX-DiffSeg/actions/workflows/unit-test.yml)
+[![CodeFactor](https://www.codefactor.io/repository/github/mathpluscode/imgx-diffseg/badge)](https://www.codefactor.io/repository/github/mathpluscode/imgx-diffseg)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 ImgX-DiffSeg is a Jax-based deep learning toolkit using Flax for biomedical image segmentation.
 
 This repository includes the implementation of the following work
@@ -7,9 +12,9 @@ This repository includes the implementation of the following work
 - [A Recycling Training Strategy for Medical Image Segmentation with Diffusion Denoising Models](https://melba-journal.org/2023:016)
 - [Importance of Aligning Training Strategy with Evaluation for Diffusion Models in 3D Multiclass Segmentation](https://arxiv.org/abs/2303.06040)
 
-:construction: **The codebase is still under active development for more enhancements and
+:construction: The codebase is still under active development for more enhancements and
 applications. Please check [release notes](https://github.com/mathpluscode/ImgX-DiffSeg/releases)
-for more information. ** :construction:
+for more information. :construction:
 
 :mailbox: Please feel free to
 [create an issue](https://github.com/mathpluscode/ImgX-DiffSeg/issues/new/choose) to request
@@ -184,16 +189,16 @@ make pip
 ## Build Data Sets
 
 :warning: For using your own data set, the following steps are not needed. Please check the
-[existing datasets](https://github.com/mathpluscode/ImgX-DiffSeg/blob/main/imgx_datasets/) for
+[existing datasets](https://github.com/mathpluscode/ImgX-DiffSeg/blob/main/imgx/datasets/) for
 examples of using TFDS. Particularly,
-[BraTS 2021](https://github.com/mathpluscode/ImgX-DiffSeg/blob/main/imgx_datasets/brats2021_mr/brats2021_mr_dataset_builder.py)
+[BraTS 2021](https://github.com/mathpluscode/ImgX-DiffSeg/blob/main/imgx/datasets/brats2021_mr/brats2021_mr_dataset_builder.py)
 does not require downloading.
 
 :muscle: We are working on a toy example for using custom data sets without TFDS, thanks for your
 understanding.
 
-Use the following commands to (re)build all data sets. Check the [README](imgx_datasets/README.md)
-of imgx_datasets for details. Especially, manual downloading is required for the BraTS 2021 dataset.
+Use the following commands to (re)build all data sets. Check the [README](imgx/datasets/README.md)
+of datasets for details. Especially, manual downloading is required for the BraTS 2021 dataset.
 
 ```bash
 make build_dataset
@@ -203,10 +208,10 @@ make rebuild_dataset
 Or build the selected data set by running one of the following commands.
 
 ```bash
-tfds build imgx_datasets/male_pelvic_mr
-tfds build imgx_datasets/amos_ct
-tfds build imgx_datasets/muscle_us
-tfds build imgx_datasets/brats2021_mr  # requires downloading data manually
+tfds build imgx/datasets/male_pelvic_mr
+tfds build imgx/datasets/amos_ct
+tfds build imgx/datasets/muscle_us
+tfds build imgx/datasets/brats2021_mr  # requires downloading data manually
 ```
 
 ## Experiment
