@@ -1,6 +1,7 @@
 """Loss functions for image segmentation."""
 import jax
 import jax.numpy as jnp
+from jax import lax
 
 
 def dice_loss_from_masks(
@@ -50,7 +51,7 @@ def dice_loss(
     Returns:
         Dice loss value of shape (batch, num_classes).
     """
-    mask_pred = jax.lax.cond(
+    mask_pred = lax.cond(
         classes_are_exclusive,
         jax.nn.softmax,
         jax.nn.sigmoid,

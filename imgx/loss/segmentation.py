@@ -4,9 +4,9 @@ from __future__ import annotations
 import jax.numpy as jnp
 from omegaconf import DictConfig
 
+from imgx.datasets.dataset_info import DatasetInfo
 from imgx.loss import cross_entropy, dice_loss, focal_loss
-from imgx.metric import class_proportion
-from imgx_datasets.dataset_info import DatasetInfo
+from imgx.metric import class_proportion, class_volume
 
 
 def segmentation_loss(
@@ -27,6 +27,7 @@ def segmentation_loss(
         - calculated loss, of shape (batch,).
         - metrics, values of shape (batch,).
     """
+    spacing = jnp.array(dataset_info.image_spacing)
     mask_true = dataset_info.label_to_mask(label, axis=-1)
     metrics = {}
 
@@ -34,6 +35,9 @@ def segmentation_loss(
     class_prop_batch_cls = class_proportion(mask_true)
     for i in range(dataset_info.num_classes):
         metrics[f"class_{i}_proportion_true"] = class_prop_batch_cls[:, i]
+    class_volume_batch_cls = class_volume(mask_true, spacing)
+    for i in range(dataset_info.num_classes):
+        metrics[f"class_{i}_volume_true"] = class_volume_batch_cls[:, i]
 
     # total loss
     loss_batch = jnp.zeros((logits.shape[0],), dtype=logits.dtype)

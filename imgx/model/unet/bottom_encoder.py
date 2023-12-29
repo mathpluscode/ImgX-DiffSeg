@@ -4,14 +4,15 @@ from __future__ import annotations
 import flax.linen as nn
 import jax.numpy as jnp
 
+from imgx.model.attention import TransformerEncoder
 from imgx.model.conv import ConvResBlock
-from imgx.model.transformer import TransformerEncoder
 
 
 class BottomImageEncoderUnet(nn.Module):
     """Image encoder module with convolutions for unet."""
 
-    kernel_size: int = 3  # convolution layer kernel size
+    kernel_size: tuple[int, ...]  # convolution layer kernel size
+    dropout: float = 0.0  # for resnet block
     num_heads: int = 8  # for multi head attention
     num_layers: int = 1  # for transformer encoder
     widening_factor: int = 4  # for key size in MHA
@@ -21,48 +22,47 @@ class BottomImageEncoderUnet(nn.Module):
     @nn.compact
     def __call__(
         self,
+        is_train: bool,
         image_emb: jnp.ndarray,
-        t_emb: jnp.ndarray | None = None,
+        t_emb: jnp.ndarray | None,
     ) -> jnp.ndarray:
         """Encoder the image.
 
         Args:
+            is_train: whether in training mode.
             image_emb: shape (batch, *spatial_shape, model_size).
             t_emb: time embedding, (batch, t_channels).
 
         Returns:
             image_emb: (batch, *spatial_shape, model_size).
         """
-        batch_size, *spatial_shape, model_size = image_emb.shape
-        num_spatial_dims = len(spatial_shape)
-        conv_res_block_cls = nn.remat(ConvResBlock) if self.remat else ConvResBlock
+        model_size = image_emb.shape[-1]
 
         # conv before attention
         # image_emb (batch, *spatial_shape, image_emb_size)
-        image_emb = conv_res_block_cls(
-            num_spatial_dims=num_spatial_dims,
+        image_emb = ConvResBlock(
             out_channels=model_size,
             kernel_size=self.kernel_size,
-        )(image_emb, t_emb)
+            dropout=self.dropout,
+            remat=self.remat,
+        )(is_train, image_emb, t_emb)
 
         # attention
-        image_emb = image_emb.reshape((batch_size, -1, model_size))
-        transformer = TransformerEncoder(
+        image_emb = TransformerEncoder(
             num_heads=self.num_heads,
-            num_layers=self.num_layers,
-            autoregressive=False,
             widening_factor=self.widening_factor,
+            dropout=self.dropout,
             remat=self.remat,
-        )
-        image_emb, _ = transformer(image_emb)
-        image_emb = image_emb.reshape((batch_size, *spatial_shape, model_size))
+            dtype=self.dtype,
+        )(is_train, image_emb)
 
         # conv after attention
         # image_emb (batch, *spatial_shape, image_emb_size)
-        image_emb = conv_res_block_cls(
-            num_spatial_dims=num_spatial_dims,
+        image_emb = ConvResBlock(
             out_channels=model_size,
             kernel_size=self.kernel_size,
-        )(image_emb, t_emb)
+            dropout=self.dropout,
+            remat=self.remat,
+        )(is_train, image_emb, t_emb)
 
         return image_emb

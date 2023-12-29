@@ -96,33 +96,21 @@ class TestMLP(chex.TestCase):
     output_size: int = 8
 
     @chex.all_variants()
-    @parameterized.named_parameters(
-        (
-            "1d",
-            (5,),
-        ),
-        (
-            "2d",
-            (5, 4),
-        ),
-        (
-            "3d",
-            (3, 5, 4),
-        ),
+    @parameterized.product(
+        in_shape=[(3, 4, 5), (3, 4), (3,)],
+        remat=[True, False],
     )
-    def test_shape(
+    def test_shapes(
         self,
         in_shape: tuple[int, ...],
+        remat: bool,
     ) -> None:
-        """Test FeedForwardBlock output shapes.
-
-        Args:
-            in_shape: input tensor shape.
-        """
+        """Test output shapes."""
         rng = {"params": jax.random.PRNGKey(0)}
         mlp = MLP(
             emb_size=self.emb_size,
             output_size=self.output_size,
+            remat=remat,
         )
         out, _ = self.variant(mlp.init_with_output)(rng, jnp.ones(in_shape))
         chex.assert_shape(out, (*in_shape[:-1], self.output_size))

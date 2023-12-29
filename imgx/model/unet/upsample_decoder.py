@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import flax.linen as nn
-import jax.lax
+import jax
 import jax.numpy as jnp
+from jax import lax
 
 from imgx.model.conv import ConvResBlock, ConvUpSample
 
@@ -11,14 +12,13 @@ from imgx.model.conv import ConvResBlock, ConvUpSample
 class UpsampleDecoder(nn.Module):
     """Upsample decoder module with convolutions for unet."""
 
-    num_spatial_dims: int  # 2 or 3
     out_channels: int
     num_channels: tuple[int, ...]  # channel at each depth, including the bottom
-    patch_size: tuple[int, ...] | int = 2  # first down sampling layer
-    scale_factor: tuple[int, ...] | int = 2  # spatial down-sampling/up-sampling
+    patch_size: tuple[int, ...]  # first down sampling layer
+    scale_factor: tuple[int, ...]  # spatial down-sampling/up-sampling
+    kernel_size: tuple[int, ...]  # convolution layer kernel size
     num_res_blocks: int = 2  # number of residual blocks
-    kernel_size: int = 3  # convolution layer kernel size
-    widening_factor: int = 4  # for key size in MHA
+    dropout: float = 0.0  # for resnet block
     out_kernel_init: jax.nn.initializers.Initializer = nn.linear.default_kernel_init
     remat: bool = True  # remat reduces memory cost at cost of compute speed
     dtype: jnp.dtype = jnp.float32
@@ -26,12 +26,14 @@ class UpsampleDecoder(nn.Module):
     @nn.compact
     def __call__(
         self,
+        is_train: bool,
         embeddings: list[jnp.ndarray],
-        t_emb: jnp.ndarray | None = None,
+        t_emb: jnp.ndarray | None,
     ) -> jnp.ndarray | list[jnp.ndarray]:
         """Decode the embedding and perform prediction.
 
         Args:
+            is_train: whether in training mode.
             embeddings: list of embeddings from each layer.
                 Starting with the first layer.
             t_emb: array of shape (batch, t_channels).
@@ -41,14 +43,7 @@ class UpsampleDecoder(nn.Module):
         """
         if len(embeddings) != len(self.num_channels) * (self.num_res_blocks + 1) + 1:
             raise ValueError("MaskDecoderConvUnet input length does not match")
-        patch_size = self.patch_size
-        scale_factor = self.scale_factor
-        if isinstance(patch_size, int):
-            patch_size = (patch_size,) * self.num_spatial_dims
-        if isinstance(scale_factor, int):
-            scale_factor = (scale_factor,) * self.num_spatial_dims
-
-        conv_res_block_cls = nn.remat(ConvResBlock) if self.remat else ConvResBlock
+        num_spatial_dims = len(self.kernel_size)
         conv_up_sample_cls = nn.remat(ConvUpSample) if self.remat else ConvUpSample
         conv_cls = nn.remat(nn.Conv) if self.remat else nn.Conv
 
@@ -66,11 +61,12 @@ class UpsampleDecoder(nn.Module):
                 x += skipped
 
                 # conv
-                x = conv_res_block_cls(
-                    num_spatial_dims=self.num_spatial_dims,
+                x = ConvResBlock(
                     out_channels=ch,
                     kernel_size=self.kernel_size,
-                )(x, t_emb)
+                    dropout=self.dropout,
+                    remat=self.remat,
+                )(is_train, x, t_emb)
 
             if i < len(self.num_channels) - 1:
                 # up-sampling
@@ -80,16 +76,18 @@ class UpsampleDecoder(nn.Module):
                 # deconv and pad to make emb of same shape as skipped
                 x = conv_up_sample_cls(
                     out_channels=self.num_channels[-i - 2],
-                    scale_factor=patch_size if i == len(self.num_channels) - 2 else scale_factor,
+                    scale_factor=self.patch_size
+                    if i == len(self.num_channels) - 2
+                    else self.scale_factor,
                 )(x)
-                x = jax.lax.dynamic_slice(
+                x = lax.dynamic_slice(
                     x,
-                    start_indices=(0,) * (self.num_spatial_dims + 2),
+                    start_indices=(0,) * (num_spatial_dims + 2),
                     slice_sizes=(x.shape[0], *skipped_shape, x.shape[-1]),
                 )
         out = conv_cls(
             features=self.out_channels,
-            kernel_size=(1,) * self.num_spatial_dims,
+            kernel_size=(1,) * num_spatial_dims,
             kernel_init=self.out_kernel_init,
         )(x)
         return out

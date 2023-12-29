@@ -8,6 +8,24 @@ import jax
 import jax.numpy as jnp
 
 
+class Identity(nn.Module):
+    """Identity module."""
+
+    dtype: jnp.dtype = jnp.float32
+
+    @nn.compact
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        """Forward pass.
+
+        Args:
+            x: input.
+
+        Returns:
+            input.
+        """
+        return x
+
+
 class InstanceNorm(nn.Module):
     """Instance norm.
 
@@ -77,6 +95,7 @@ class MLP(nn.Module):
     kernel_init: Callable[
         [jax.Array, jnp.shape, jnp.dtype], jnp.ndarray
     ] = nn.initializers.lecun_normal()
+    remat: bool = True
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
@@ -89,18 +108,16 @@ class MLP(nn.Module):
         Returns:
             shape (..., out_size)
         """
-        return nn.Sequential(
-            [
-                nn.Dense(
-                    self.emb_size,
-                    kernel_init=self.kernel_init,
-                    dtype=self.dtype,
-                ),
-                self.activation,
-                nn.Dense(
-                    self.output_size,
-                    kernel_init=self.kernel_init,
-                    dtype=self.dtype,
-                ),
-            ]
+        dense_cls = nn.remat(nn.Dense) if self.remat else nn.Dense
+        x = dense_cls(
+            self.emb_size,
+            kernel_init=self.kernel_init,
+            dtype=self.dtype,
         )(x)
+        x = self.activation(x)
+        x = dense_cls(
+            self.output_size,
+            kernel_init=self.kernel_init,
+            dtype=self.dtype,
+        )(x)
+        return x

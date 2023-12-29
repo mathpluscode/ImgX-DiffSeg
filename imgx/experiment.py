@@ -1,20 +1,20 @@
 """Experiment interface."""
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import chex
 import jax
 import jax.numpy as jnp
+import numpy as np
 import tensorflow as tf
 from absl import logging
-from flax import jax_utils
 from omegaconf import DictConfig
 
-from imgx.data.iterator import get_image_tfds_dataset
-from imgx.metric.util import aggregate_pmap_metrics
+from imgx.datasets import INFO_MAP
+from imgx.metric.util import merge_aggregated_metrics
 from imgx.train_state import TrainState
-from imgx_datasets import INFO_MAP
 
 
 class Experiment:
@@ -37,33 +37,18 @@ class Experiment:
                 f"Visible TPU devices: {tf.config.get_visible_devices('TPU')}."
             )
 
-        # save config
         self.config = config
-
-        # init data loaders and networks
         self.dataset_info = INFO_MAP[self.config.data.name]
-        self.dataset = get_image_tfds_dataset(
-            dataset_name=self.config.data.name,
-            config=self.config,
-        )
-        self.train_iter = self.dataset.train_iter
-        self.valid_iter = self.dataset.valid_iter
-        self.test_iter = self.dataset.test_iter
-        platform = jax.local_devices()[0].platform
-        if platform not in ["cpu", "tpu"]:
-            self.train_iter = jax_utils.prefetch_to_device(self.train_iter, 2)
-            self.valid_iter = jax_utils.prefetch_to_device(self.valid_iter, 2)
-            self.test_iter = jax_utils.prefetch_to_device(self.test_iter, 2)
-
         self.p_train_step = None  # To be defined in train_init
         self.p_eval_step = None  # To be defined in train_init
 
     def train_init(
-        self, ckpt_dir: Path | None = None, step: int | None = None
+        self, batch: dict[str, jnp.ndarray], ckpt_dir: Path | None = None, step: int | None = None
     ) -> tuple[TrainState, int]:
         """Initialize data loader, loss, networks for training.
 
         Args:
+            batch: training data.
             ckpt_dir: checkpoint directory to restore from.
             step: checkpoint step to restore from, if None use the latest one.
 
@@ -73,12 +58,13 @@ class Experiment:
         raise NotImplementedError
 
     def train_step(
-        self, train_state: TrainState, key: jax.Array
-    ) -> tuple[TrainState, jax.Array, chex.ArrayTree]:
+        self, train_state: TrainState, batch: dict[str, jnp.ndarray], key: jax.Array
+    ) -> tuple[TrainState, chex.ArrayTree]:
         """Perform a training step.
 
         Args:
             train_state: training state.
+            batch: training data.
             key: random key.
 
         Returns:
@@ -86,33 +72,35 @@ class Experiment:
             - new random key.
             - metric dict.
         """
-        batch = next(self.train_iter)
-        train_state, key, metrics = self.p_train_step(  # pylint: disable=not-callable
+        # key is updated/fold inside pmap function
+        # to ensure a different key is used per step
+        train_state, metrics = self.p_train_step(  # pylint: disable=not-callable
             train_state,
             batch,
             key,
         )
-        metrics = aggregate_pmap_metrics(metrics)
+        metrics = merge_aggregated_metrics(metrics)
         metrics = jax.tree_map(lambda x: x.item(), metrics)  # tensor to values
-        return train_state, key, metrics
+        return train_state, metrics
 
     def eval_step(
         self,
         train_state: TrainState,
+        iterator: Iterator[dict[str, jnp.ndarray]],
+        num_steps: int,
         key: jax.Array,
-        split: str,
         out_dir: Path | None = None,
-    ) -> tuple[jax.Array, chex.ArrayTree]:
+    ) -> dict[str, jnp.ndarray]:
         """Evaluation on entire validation/test data set.
 
         Args:
             train_state: training state.
+            iterator: data iterator.
+            num_steps: number of steps for evaluation.
             key: random key.
-            split: split to evaluate.
             out_dir: output directory, if not None, predictions will be saved.
 
         Returns:
-            random key.
             metric dict.
         """
         raise NotImplementedError
@@ -124,25 +112,19 @@ class Experiment:
         batch: dict[str, jnp.ndarray],
         uids: list[str],
         device_cpu: jax.Device,
-        out_dir: Path | None,
-        reference_suffix: str = "mask_preprocessed",
-        output_suffix: str = "mask_pred",
-    ) -> tuple[dict[str, jnp.ndarray], jnp.ndarray, jax.Array]:
+    ) -> tuple[list[str], dict[str, np.ndarray], dict[str, np.ndarray]]:
         """Evaluate a batch.
 
         Args:
             train_state: training state.
             key: random key.
             batch: batch data without uid.
-            uids: uids in the batch.
+            uids: uids in the batch, potentially including padded samples.
             device_cpu: cpu device.
-            out_dir: output directory, if not None, predictions will be saved.
-            reference_suffix: suffix of reference image.
-            output_suffix: suffix of output image.
 
         Returns:
-            metrics, each item has shape (num_shards*batch,).
-            label_pred: predicted label, of shape (num_shards*batch, *spatial_shape).
-            key: random key.
+            uids: uids in the batch, excluding padded samples.
+            metrics: each item has shape (num_samples,).
+            prediction dict: each item has shape (num_samples, ...).
         """
         raise NotImplementedError

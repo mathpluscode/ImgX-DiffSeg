@@ -6,17 +6,18 @@ import hydra
 import jax
 import wandb
 from absl import logging
+from flax import jax_utils
 from flax.training import common_utils
 from flax.training.early_stopping import EarlyStopping
 from omegaconf import DictConfig, OmegaConf
 
 from imgx.config import flatten_dict
+from imgx.data.iterator import get_image_tfds_dataset
+from imgx.datasets import INFO_MAP
 from imgx.experiment import Experiment
 from imgx.task.diffusion_segmentation.experiment import DiffusionSegmentationExperiment
 from imgx.task.segmentation.experiment import SegmentationExperiment
 from imgx.train_state import save_checkpoint
-from imgx_datasets import INFO_MAP
-from imgx_datasets.constant import VALID_SPLIT
 
 logging.set_verbosity(logging.INFO)
 
@@ -149,6 +150,32 @@ def main(  # pylint:disable=too-many-statements
     config, tags = process_config(config)
     logging.info(OmegaConf.to_yaml(config))
 
+    # init data
+    dataset = get_image_tfds_dataset(
+        dataset_name=config.data.name,
+        config=config,
+    )
+    train_iter = dataset.train_iter
+    valid_iter = dataset.valid_iter
+    platform = jax.local_devices()[0].platform
+    if platform not in ["cpu", "tpu"]:
+        train_iter = jax_utils.prefetch_to_device(train_iter, 2)
+        valid_iter = jax_utils.prefetch_to_device(valid_iter, 2)
+
+    # init model
+    run = build_experiment(config=config)
+    key_train, key_eval = jax.random.split(jax.random.PRNGKey(config.seed))
+    key_train = common_utils.shard_prng_key(key_train)  # each replica has a different key
+    key_eval = common_utils.shard_prng_key(key_eval)
+
+    # init training
+    batch_size_per_step = get_batch_size_per_step(config)
+    max_num_steps = config.data.trainer.max_num_samples // batch_size_per_step
+    early_stop = EarlyStopping(
+        min_delta=config.task.early_stopping.min_delta,
+        patience=config.task.early_stopping.patience,
+    )
+
     # init wandb
     settings = None
     if config.logging.root_dir:
@@ -168,24 +195,15 @@ def main(  # pylint:disable=too-many-statements
         OmegaConf.save(config=config, f=files_dir / "config_backup.yaml")
         ckpt_dir = files_dir / "ckpt"
 
-        # init model
-        run = build_experiment(config=config)
-        train_state, step_offset = run.train_init()
-        key = jax.random.PRNGKey(config.seed)
-        key = common_utils.shard_prng_key(key)  # each replica has a different key
-
-        logging.info(
-            f"Start training with early stopping on {config.task.early_stopping.metric} "
-            f"and patience = {config.task.early_stopping.patience}."
-        )
-        batch_size_per_step = get_batch_size_per_step(config)
-        max_num_steps = config.data.trainer.max_num_samples // batch_size_per_step
-        early_stop = EarlyStopping(
-            min_delta=config.task.early_stopping.min_delta,
-            patience=config.task.early_stopping.patience,
-        )
-        for i in range(1 + step_offset, 1 + max_num_steps):
-            train_state, key, train_metrics = run.train_step(train_state, key)
+        for i in range(max_num_steps):
+            batch = next(train_iter)
+            if i == 0:
+                # TODO support reload checkpoint
+                train_state, step_offset = run.train_init(batch)
+            if i + step_offset > max_num_steps:
+                # stop training
+                break
+            train_state, train_metrics = run.train_step(train_state, batch, key_train)
             train_metrics = {"train_" + k: v for k, v in train_metrics.items()}
             metrics = {
                 "num_samples": i * batch_size_per_step,
@@ -201,8 +219,11 @@ def main(  # pylint:disable=too-many-statements
                     # when early stop, it's patience+1 ckpt
                     keep=config.task.early_stopping.patience + 1,
                 )
-                key, val_metrics = run.eval_step(
-                    train_state=train_state, key=key, split=VALID_SPLIT
+                val_metrics = run.eval_step(
+                    train_state=train_state,
+                    iterator=valid_iter,
+                    num_steps=dataset.num_valid_steps,
+                    key=key_eval,
                 )
                 out_dir = Path(ckpt_path)
                 if config.task.name == "diffusion_segmentation":

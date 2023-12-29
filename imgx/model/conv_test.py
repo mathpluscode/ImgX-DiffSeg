@@ -5,7 +5,7 @@ import jax
 from absl.testing import parameterized
 from chex._src import fake
 
-from imgx.model.conv import ConvDownSample, ConvUpSample
+from imgx.model.conv import ConvDownSample, ConvResBlock, ConvUpSample
 
 
 # Set `FLAGS.chex_n_cpu_devices` CPU devices for all tests.
@@ -138,3 +138,58 @@ class TestConvUpSample(chex.TestCase):
         )
         out, _ = self.variant(conv.init_with_output)(rng, x)
         chex.assert_shape(out, (self.batch, *out_shape, out_channels))
+
+
+class TestConvResBlock(chex.TestCase):
+    """Test ConvResBlock."""
+
+    batch = 2
+
+    @chex.all_variants()
+    @parameterized.product(
+        in_shape=[(12,), (12, 13), (12, 13, 14)],
+        has_t=[True, False],
+        dropout=[0.0, 0.5, 1.0],
+        is_train=[True, False],
+        remat=[True, False],
+    )
+    def test_shapes(
+        self,
+        in_shape: tuple[int, ...],
+        has_t: bool,
+        dropout: float,
+        is_train: bool,
+        remat: bool,
+    ) -> None:
+        """Test output shapes.
+
+        Args:
+            in_shape: input shape, without batch, channel.
+            has_t: whether has time embedding.
+            dropout: dropout rate.
+            is_train: whether in training mode.
+            remat: remat or not.
+        """
+        kernel_size = (3,) * len(in_shape)
+        in_channels = 1
+        t_channels = 2
+        out_channels = 1
+        rng = {"params": jax.random.PRNGKey(0), "dropout": jax.random.PRNGKey(1)}
+        conv = ConvResBlock(
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            dropout=dropout,
+            remat=remat,
+        )
+        x = jax.random.uniform(
+            jax.random.PRNGKey(0),
+            shape=(self.batch, *in_shape, in_channels),
+        )
+        t_emb = None
+        if has_t:
+            t_emb = jax.random.uniform(
+                jax.random.PRNGKey(0),
+                shape=(self.batch, t_channels),
+            )
+        out, _ = self.variant(conv.init_with_output, static_argnums=(1,))(rng, is_train, x, t_emb)
+        chex.assert_shape(out, (self.batch, *in_shape, out_channels))

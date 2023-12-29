@@ -10,22 +10,21 @@ from imgx.model.conv import ConvDownSample, ConvNormAct, ConvResBlock
 class DownsampleEncoder(nn.Module):
     """Down-sample encoder module with convolutions for unet."""
 
-    num_spatial_dims: int  # 2 or 3
     num_channels: tuple[int, ...]  # channel at each depth, including the bottom
-    patch_size: tuple[int, ...] | int = 2  # first down sampling layer
-    scale_factor: tuple[int, ...] | int = 2  # spatial down-sampling/up-sampling
+    patch_size: tuple[int, ...]  # first down sampling layer
+    scale_factor: tuple[int, ...]  # spatial down-sampling/up-sampling
+    kernel_size: tuple[int, ...]  # convolution layer kernel size
     num_res_blocks: int = 2  # number of residual blocks
-    kernel_size: int = 3  # convolution layer kernel size
-    num_heads: int = 8  # for multi head attention/MHA
-    widening_factor: int = 4  # for key size in MHA
+    dropout: float = 0.0  # for resnet block
     remat: bool = True  # reduces memory cost at cost of compute speed
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
     def __call__(
         self,
+        is_train: bool,
         x: jnp.ndarray,
-        t_emb: jnp.ndarray | None = None,
+        t_emb: jnp.ndarray | None,
     ) -> list[jnp.ndarray]:
         """Encoder the image.
 
@@ -43,28 +42,20 @@ class DownsampleEncoder(nn.Module):
             (2, 32, 32, 4, 4), from residual block, i=2
 
         Args:
+            is_train: whether in training mode.
             x: array of shape (batch, *spatial_shape, in_channels).
             t_emb: array of shape (batch, t_channels).
 
         Returns:
             List of embeddings from each layer.
         """
-        patch_size = self.patch_size
-        scale_factor = self.scale_factor
-        if isinstance(patch_size, int):
-            patch_size = (patch_size,) * self.num_spatial_dims
-        if isinstance(scale_factor, int):
-            scale_factor = (scale_factor,) * self.num_spatial_dims
-
-        conv_norm_act_cls = nn.remat(ConvNormAct) if self.remat else ConvNormAct
-        conv_res_block_cls = nn.remat(ConvResBlock) if self.remat else ConvResBlock
         conv_down_sample_cls = nn.remat(ConvDownSample) if self.remat else ConvDownSample
 
         # encoder raw input
-        x = conv_norm_act_cls(
-            num_spatial_dims=self.num_spatial_dims,
+        x = ConvNormAct(
             out_channels=self.num_channels[0],
             kernel_size=self.kernel_size,
+            remat=self.remat,
         )(x)
 
         # encoding
@@ -73,11 +64,12 @@ class DownsampleEncoder(nn.Module):
             # residual blocks
             # spatial shape get halved by 2**i
             for _ in range(self.num_res_blocks):
-                x = conv_res_block_cls(
-                    num_spatial_dims=self.num_spatial_dims,
+                x = ConvResBlock(
                     out_channels=ch,
                     kernel_size=self.kernel_size,
-                )(x, t_emb)
+                    dropout=self.dropout,
+                    remat=self.remat,
+                )(is_train, x, t_emb)
                 embeddings.append(x)
 
             # down-sampling for non-bottom layers
@@ -85,7 +77,7 @@ class DownsampleEncoder(nn.Module):
             if i < len(self.num_channels) - 1:
                 x = conv_down_sample_cls(
                     out_channels=self.num_channels[i + 1],
-                    scale_factor=patch_size if i == 0 else scale_factor,
+                    scale_factor=self.patch_size if i == 0 else self.scale_factor,
                 )(x)
                 embeddings.append(x)
 

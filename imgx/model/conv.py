@@ -13,10 +13,14 @@ from imgx.model.basic import InstanceNorm
 class ConvNormAct(nn.Module):
     """Block with conv-norm-act."""
 
-    num_spatial_dims: int
     out_channels: int
-    kernel_size: int
+    kernel_size: tuple[int, ...]
+    strides: tuple[int, ...] | int = 1
+    padding: str = "SAME"
+    feature_group_count: int = 1
+    norm: nn.Module = InstanceNorm
     activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.gelu
+    remat: bool = True
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
@@ -30,17 +34,23 @@ class ConvNormAct(nn.Module):
             x: (batch, *spatial_shape, in_channels).
 
         Returns:
-            Array.
+            (batch, *spatial_shape, out_channels),
+            output spatial shape may be different from input.
         """
+        conv_cls = nn.remat(nn.Conv) if self.remat else nn.Conv
+        norm_cls = nn.remat(self.norm) if self.remat else self.norm
         return nn.Sequential(
             [
-                nn.Conv(
+                conv_cls(
                     features=self.out_channels,
-                    kernel_size=(self.kernel_size,) * self.num_spatial_dims,
+                    kernel_size=self.kernel_size,
+                    strides=self.strides,
+                    padding=self.padding,
+                    feature_group_count=self.feature_group_count,
                     use_bias=False,
                     dtype=self.dtype,
                 ),
-                InstanceNorm(dtype=self.dtype),
+                norm_cls(dtype=self.dtype),
                 self.activation,
             ]
         )(x)
@@ -49,41 +59,49 @@ class ConvNormAct(nn.Module):
 class ConvResBlockWithoutTime(nn.Module):
     """Block with two conv-norm-act layers, residual link, but without time."""
 
-    num_spatial_dims: int
     out_channels: int
-    kernel_size: int
+    kernel_size: tuple[int, ...]
+    norm: nn.Module = InstanceNorm
     activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.gelu
+    dropout: float = 0.0
+    remat: bool = True
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
     def __call__(
         self,
+        is_train: bool,
         x: jnp.ndarray,
     ) -> jnp.ndarray:
         """Forward pass.
 
         Args:
+            is_train: whether in training mode.
             x: (batch, *spatial_shape, in_channels).
 
         Returns:
-            Array.
+            (batch, *spatial_shape, out_channels),
+            output spatial shape may be different from input.
         """
+        conv_cls = nn.remat(nn.Conv) if self.remat else nn.Conv
+        norm_cls = nn.remat(self.norm) if self.remat else self.norm
         res = x
-        x = nn.Conv(
+        x = conv_cls(
             features=self.out_channels,
-            kernel_size=(self.kernel_size,) * self.num_spatial_dims,
+            kernel_size=self.kernel_size,
             use_bias=False,
             dtype=self.dtype,
         )(x)
-        x = InstanceNorm(dtype=self.dtype)(x)
+        x = norm_cls(dtype=self.dtype)(x)
         x = self.activation(x)
-        x = nn.Conv(
+        x = nn.Dropout(rate=self.dropout, deterministic=not is_train)(x)
+        x = conv_cls(
             features=self.out_channels,
-            kernel_size=(self.kernel_size,) * self.num_spatial_dims,
+            kernel_size=self.kernel_size,
             use_bias=False,
             dtype=self.dtype,
         )(x)
-        x = InstanceNorm(dtype=self.dtype)(x)
+        x = norm_cls(dtype=self.dtype)(x)
         x = self.activation(x + res)
         return x
 
@@ -94,48 +112,59 @@ class ConvResBlockWithTime(nn.Module):
     https://github.com/CompVis/stable-diffusion/blob/main/ldm/modules/diffusionmodules/model.py
     """
 
-    num_spatial_dims: int
     out_channels: int
-    kernel_size: int
+    kernel_size: tuple[int, ...]
+    norm: nn.Module = InstanceNorm
     activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.gelu
+    dropout: float = 0.0
+    remat: bool = True
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
     def __call__(
         self,
+        is_train: bool,
         x: jnp.ndarray,
         t_emb: jnp.ndarray,
     ) -> jnp.ndarray:
         """Forward pass.
 
         Args:
+            is_train: whether in training mode.
             x: (batch, *spatial_shape, in_channels).
             t_emb: time embedding, (batch, t_channels).
 
         Returns:
-            Array.
+            (batch, *spatial_shape, out_channels),
+            output spatial shape may be different from input.
         """
-        t_emb = jnp.expand_dims(t_emb, axis=range(1, self.num_spatial_dims + 1))
+        dense_cls = nn.remat(nn.Dense) if self.remat else nn.Dense
+        conv_cls = nn.remat(nn.Conv) if self.remat else nn.Conv
+        norm_cls = nn.remat(self.norm) if self.remat else self.norm
+
+        num_spatial_dims = len(self.kernel_size)
+        t_emb = jnp.expand_dims(t_emb, axis=range(1, num_spatial_dims + 1))
         t_emb = self.activation(t_emb)
-        t_emb = nn.Dense(self.out_channels, dtype=self.dtype)(t_emb)
+        t_emb = dense_cls(self.out_channels, dtype=self.dtype)(t_emb)
 
         res = x
-        x = nn.Conv(
+        x = conv_cls(
             features=self.out_channels,
-            kernel_size=(self.kernel_size,) * self.num_spatial_dims,
+            kernel_size=self.kernel_size,
             use_bias=False,
             dtype=self.dtype,
         )(x)
-        x = InstanceNorm(dtype=self.dtype)(x)
+        x = norm_cls(dtype=self.dtype)(x)
         x = self.activation(x)
-        x = nn.Conv(
+        x = nn.Dropout(rate=self.dropout, deterministic=not is_train)(x)
+        x = conv_cls(
             features=self.out_channels,
-            kernel_size=(self.kernel_size,) * self.num_spatial_dims,
+            kernel_size=self.kernel_size,
             use_bias=False,
             dtype=self.dtype,
         )(x)
         x += t_emb
-        x = InstanceNorm(dtype=self.dtype)(x)
+        x = norm_cls(dtype=self.dtype)(x)
         x = self.activation(x + res)
         return x
 
@@ -146,21 +175,24 @@ class ConvResBlock(nn.Module):
     https://github.com/CompVis/stable-diffusion/blob/main/ldm/modules/diffusionmodules/model.py
     """
 
-    num_spatial_dims: int
     out_channels: int
-    kernel_size: int
+    kernel_size: tuple[int, ...]
     activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.gelu
+    dropout: float = 0.0
+    remat: bool = True
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
     def __call__(
         self,
+        is_train: bool,
         x: jnp.ndarray,
-        t_emb: jnp.ndarray | None = None,
+        t_emb: jnp.ndarray | None,
     ) -> jnp.ndarray:
         """Forward pass.
 
         Args:
+            is_train: whether in training mode.
             x: (batch, *spatial_shape, in_channels).
             t_emb: time embedding, if not None, (batch, t_channels).
 
@@ -169,21 +201,23 @@ class ConvResBlock(nn.Module):
         """
         if t_emb is None:
             return ConvResBlockWithoutTime(
-                num_spatial_dims=self.num_spatial_dims,
                 out_channels=self.out_channels,
                 kernel_size=self.kernel_size,
                 activation=self.activation,
+                dropout=self.dropout,
+                remat=self.remat,
                 dtype=self.dtype,
-            )(x)
+            )(is_train, x)
 
         conv_t = ConvResBlockWithTime(
-            num_spatial_dims=self.num_spatial_dims,
             out_channels=self.out_channels,
             kernel_size=self.kernel_size,
             activation=self.activation,
+            dropout=self.dropout,
+            remat=self.remat,
             dtype=self.dtype,
         )
-        return conv_t(x, t_emb)
+        return conv_t(is_train, x, t_emb)
 
 
 class ConvDownSample(nn.Module):
@@ -191,6 +225,7 @@ class ConvDownSample(nn.Module):
 
     out_channels: int
     scale_factor: tuple[int, ...]
+    norm: nn.Module = InstanceNorm
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
@@ -216,7 +251,7 @@ class ConvDownSample(nn.Module):
                     use_bias=False,
                     dtype=self.dtype,
                 ),
-                InstanceNorm(dtype=self.dtype),
+                self.norm(dtype=self.dtype),
             ]
         )(x)
 
@@ -226,6 +261,7 @@ class ConvUpSample(nn.Module):
 
     out_channels: int
     scale_factor: tuple[int, ...]
+    norm: nn.Module = InstanceNorm
     dtype: jnp.dtype = jnp.float32
 
     @nn.compact
@@ -251,6 +287,6 @@ class ConvUpSample(nn.Module):
                     use_bias=False,
                     dtype=self.dtype,
                 ),
-                InstanceNorm(dtype=self.dtype),
+                self.norm(dtype=self.dtype),
             ]
         )(x)

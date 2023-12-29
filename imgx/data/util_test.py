@@ -1,4 +1,4 @@
-"""Tests for image utils of imgx_datasets."""
+"""Tests for image utils of datasets."""
 
 
 import chex

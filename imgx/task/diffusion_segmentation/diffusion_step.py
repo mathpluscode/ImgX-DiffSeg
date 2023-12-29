@@ -6,13 +6,13 @@ import jax
 import jax.numpy as jnp
 from omegaconf import DictConfig
 
+from imgx.datasets.constant import IMAGE, LABEL
+from imgx.datasets.dataset_info import DatasetInfo
 from imgx.diffusion.time_sampler import TimeSampler
 from imgx.loss.segmentation import segmentation_loss
 from imgx.metric.util import aggregate_metrics, aggregate_metrics_for_diffusion
 from imgx.task.diffusion_segmentation.diffusion import DiffusionSegmentation
 from imgx.task.diffusion_segmentation.train_state import TrainState
-from imgx_datasets.constant import IMAGE, LABEL
-from imgx_datasets.dataset_info import DatasetInfo
 
 
 def get_loss_logits_metrics(
@@ -120,15 +120,15 @@ def get_diffusion_loss_step(
 
     def loss_step(
         params: chex.ArrayTree,
-        batch: chex.ArrayTree,
+        batch: dict[str, jnp.ndarray],
         key: jax.Array,
     ) -> tuple[jnp.ndarray, tuple[jnp.ndarray, chex.ArrayTree, jnp.ndarray, jnp.ndarray]]:
         """Apply forward and calculate loss."""
+        key_dropout, key_t, key_noise = jax.random.split(key=key, num=3)
         image, label = batch[IMAGE], batch[LABEL]
         mask_true = dataset_info.label_to_mask(label, axis=-1, dtype=image.dtype)
         x_start = diffusion_model.mask_to_x(mask=mask_true)
         batch_size = image.shape[0]
-        key_t, key_noise = jax.random.split(key=key)
 
         # t, t_index, probs_t
         t, t_index, probs_t = time_sampler.sample(
@@ -150,9 +150,11 @@ def get_diffusion_loss_step(
         # forward
         model_out = train_state.apply_fn(
             {"params": params},
+            True,  # is_train
             image,
             mask_t,
             t,
+            rngs={"dropout": key_dropout},
         )
 
         # loss

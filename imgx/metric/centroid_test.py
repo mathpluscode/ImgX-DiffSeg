@@ -19,7 +19,7 @@ def setUpModule() -> None:  # pylint: disable=invalid-name
 
 
 class TestCentroid(chex.TestCase):
-    """Test get_coordinate_grid."""
+    """Test get_centroid."""
 
     @chex.all_variants()
     @parameterized.named_parameters(
@@ -159,7 +159,7 @@ class TestCentroid(chex.TestCase):
 
 
 class TestCentroidDistance(chex.TestCase):
-    """Test get_coordinate_grid."""
+    """Test centroid_distance."""
 
     @chex.all_variants()
     @parameterized.named_parameters(

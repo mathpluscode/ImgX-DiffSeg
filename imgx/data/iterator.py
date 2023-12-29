@@ -16,9 +16,7 @@ from absl import logging
 from omegaconf import DictConfig
 
 from imgx.data.util import get_foreground_range, maybe_pad_batch, tf_to_numpy
-from imgx.device import shard
-from imgx.train_state import get_half_precision_dtype
-from imgx_datasets.constant import (
+from imgx.datasets.constant import (
     FOREGROUND_RANGE,
     IMAGE,
     LABEL,
@@ -27,6 +25,8 @@ from imgx_datasets.constant import (
     UID,
     VALID_SPLIT,
 )
+from imgx.device import shard
+from imgx.train_state import get_half_precision_dtype
 
 DatasetIterator = namedtuple(
     "DatasetIterator",

@@ -5,11 +5,12 @@ from pathlib import Path
 
 import jax
 from absl import logging
+from flax import jax_utils
 from flax.training import common_utils
 from omegaconf import DictConfig, OmegaConf
 
+from imgx.data.iterator import get_image_tfds_dataset
 from imgx.run_train import build_experiment
-from imgx_datasets.constant import VALID_SPLIT
 
 logging.set_verbosity(logging.INFO)
 
@@ -108,6 +109,21 @@ def main() -> None:
     # find all available checkpoints
     steps = get_checkpoint_steps(log_dir=args.log_dir)
 
+    key = jax.random.PRNGKey(config.seed)
+    key = common_utils.shard_prng_key(key)  # each replica has a different key
+
+    # init data
+    dataset = get_image_tfds_dataset(
+        dataset_name=config.data.name,
+        config=config,
+    )
+    train_iter = dataset.train_iter
+    valid_iter = dataset.valid_iter
+    platform = jax.local_devices()[0].platform
+    if platform not in ["cpu", "tpu"]:
+        train_iter = jax_utils.prefetch_to_device(train_iter, 2)
+        valid_iter = jax_utils.prefetch_to_device(valid_iter, 2)
+
     # evaluate
     ckpt_dir = args.log_dir / "files" / "ckpt"
     run = build_experiment(config=config)
@@ -115,12 +131,13 @@ def main() -> None:
         logging.info(f"Starting valid split evaluation for step {step}.")
 
         # load checkpoint
-        train_state, _ = run.train_init(ckpt_dir=ckpt_dir, step=step)
+        batch = next(train_iter)
+        train_state, _ = run.train_init(batch=batch, ckpt_dir=ckpt_dir, step=step)
 
         # evaluation
-        key = jax.random.PRNGKey(config.seed)
-        key = common_utils.shard_prng_key(key)  # each replica has a different key
-        _, val_metrics = run.eval_step(train_state=train_state, key=key, split=VALID_SPLIT)
+        val_metrics = run.eval_step(
+            train_state=train_state, iterator=valid_iter, num_steps=dataset.num_valid_steps, key=key
+        )
 
         # save metrics
         out_dir = ckpt_dir / f"checkpoint_{step}"

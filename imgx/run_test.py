@@ -6,11 +6,12 @@ from pathlib import Path
 import jax
 import numpy as np
 from absl import logging
+from flax import jax_utils
 from flax.training import common_utils
 
+from imgx.data.iterator import get_image_tfds_dataset
 from imgx.run_train import build_experiment
 from imgx.run_valid import get_checkpoint_steps, load_and_parse_config
-from imgx_datasets.constant import TEST_SPLIT
 
 logging.set_verbosity(logging.INFO)
 
@@ -25,7 +26,6 @@ def get_best_checkpoint_step(
 
     Args:
         log_dir: Directory of entire log.
-        step: step for checkpoint, -1 means select the best one.
         metric: metric to maximise or minimise.
         max_metric: maximise the metric or not.
         sampler: sampler for diffusion.
@@ -80,6 +80,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
     )
     parser.add_argument(
+        "--dataset_name",
+        type=str,
+        help="Data set name.",
+        default=None,
+    )
+    parser.add_argument(
         "--step",
         type=int,
         help="Step for identify checkpoint.",
@@ -126,12 +132,27 @@ def main() -> None:
     config = load_and_parse_config(
         log_dir=args.log_dir, num_timesteps=args.num_timesteps, sampler=args.sampler
     )
+    if args.dataset_name:
+        # test dataset can be different from training dataset
+        config.data.name = args.dataset_name
 
     # prepare output directory
-    out_dir = args.log_dir / "files" / "test_evaluation" / f"seed_{args.seed}"
+    out_dir = args.log_dir / "files" / "test" / config.data.name / f"seed_{args.seed}"
     if config.task.name == "diffusion_segmentation":
         out_dir = out_dir / f"sample_{args.num_timesteps}_steps" / args.sampler
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # init data
+    dataset = get_image_tfds_dataset(
+        dataset_name=config.data.name,
+        config=config,
+    )
+    train_iter = dataset.train_iter
+    test_iter = dataset.test_iter
+    platform = jax.local_devices()[0].platform
+    if platform not in ["cpu", "tpu"]:
+        train_iter = jax_utils.prefetch_to_device(train_iter, 2)
+        test_iter = jax_utils.prefetch_to_device(test_iter, 2)
 
     # find checkpoint
     step = args.step
@@ -148,15 +169,17 @@ def main() -> None:
     logging.info(f"Starting test split evaluation for seed {args.seed}.")
     ckpt_dir = args.log_dir / "files" / "ckpt"
     run = build_experiment(config=config)
-    train_state, _ = run.train_init(ckpt_dir=ckpt_dir, step=step)
+    batch = next(train_iter)
+    train_state, _ = run.train_init(batch=batch, ckpt_dir=ckpt_dir, step=step)
 
     key = jax.random.PRNGKey(args.seed)
     key = common_utils.shard_prng_key(key)  # each replica has a different key
 
-    _, test_metrics = run.eval_step(
+    test_metrics = run.eval_step(
         train_state=train_state,
+        iterator=test_iter,
+        num_steps=dataset.num_test_steps,
         key=key,
-        split=TEST_SPLIT,
         out_dir=out_dir,
     )
     with open(out_dir / "mean_metrics.json", "w", encoding="utf-8") as f:

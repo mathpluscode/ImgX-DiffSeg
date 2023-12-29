@@ -8,21 +8,8 @@ This repository includes the implementation of the following work
 - [Importance of Aligning Training Strategy with Evaluation for Diffusion Models in 3D Multiclass Segmentation](https://arxiv.org/abs/2303.06040)
 
 :construction: **The codebase is still under active development for more enhancements and
-applications.** :construction:
-
-- November 2023:
-  - :warning: Upgraded to JAX to 0.4.20.
-  - :warning: Removed Haiku-specific modification to convolutional layers. This may impact model
-    performance.
-  - :smiley: Added example notebooks for inference on a single image without TFDS.
-  - Added integration tests for training, validation, and testing.
-  - Refactored config.
-    - Added `patch_size` and `scale_factor` to data config.
-    - Moved loss config from the main config to task config.
-  - Refactored code, including defining `imgx/task` submodule.
-- October 2023:
-  - :blush: Migrated from [Haiku](https://github.com/google-deepmind/dm-haiku) to
-    [Flax](https://github.com/google/flax) following Google DeepMind's recommendation.
+applications. Please check [release notes](https://github.com/mathpluscode/ImgX-DiffSeg/releases)
+for more information. ** :construction:
 
 :mailbox: Please feel free to
 [create an issue](https://github.com/mathpluscode/ImgX-DiffSeg/issues/new/choose) to request
@@ -38,7 +25,7 @@ Current supported functionalities are summarized as follows.
 
 **Data sets**
 
-See the [readme](imgx_datasets/README.md) for further details.
+See the [readme](imgx/datasets/README.md) for further details.
 
 - Muscle ultrasound from [Marzola et al. 2021](https://data.mendeley.com/datasets/3jykz7wz8d/1).
 - Male pelvic MR from [Li et al. 2022](https://zenodo.org/record/7013610#.Y1U95-zMKrM).
@@ -68,6 +55,10 @@ See the [readme](imgx_datasets/README.md) for further details.
 **Training**
 
 - Patch-based training.
+- Data augmentation with anisotropic support, including
+  - Random affine: rotation, scaling, shearing, shifting.
+  - Random gamma adjustment.
+  - Random flip.
 - Multi-device training (one model per device) with
   [`pmap`](https://jax.readthedocs.io/en/latest/_autosummary/jax.pmap.html).
 - Mixed precision training.
@@ -284,7 +275,6 @@ Run the command below to test and get a coverage report. As JAX tests require tw
 
 ```bash
 pytest --cov=imgx -n 4 imgx -k "not integration"
-pytest --cov=imgx_datasets -n 4 imgx_datasets
 ```
 
 `-k "not integration"` excludes integration tests, which require downloading muscle ultrasound and

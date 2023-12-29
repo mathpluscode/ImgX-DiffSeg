@@ -3,6 +3,7 @@
 import chex
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 import pytest
 from absl.testing import parameterized
@@ -56,6 +57,7 @@ class TestUnet(chex.TestCase):
         ),
         with_time=[True, False],
         patch_size=[2, 4],
+        is_train=[True, False],
     )
     def test_output_shape(
         self,
@@ -65,6 +67,7 @@ class TestUnet(chex.TestCase):
         scale_factor: int,
         num_spatial_dims: int,
         with_time: bool,
+        is_train: bool,
     ) -> None:
         """Test output shape.
 
@@ -75,8 +78,9 @@ class TestUnet(chex.TestCase):
             kernel_size: convolution kernel size, the value(s) should be odd.
             num_spatial_dims: number of spatial dimensions.
             with_time: with time or not.
+            is_train: whether in training mode.
         """
-        rng = {"params": jax.random.PRNGKey(0)}
+        rng = {"params": jax.random.PRNGKey(0), "dropout": jax.random.PRNGKey(1)}
         num_channels = (8, 16)
 
         unet = Unet(
@@ -89,7 +93,6 @@ class TestUnet(chex.TestCase):
             kernel_size=kernel_size,
             scale_factor=scale_factor,
         )
-
         image = jnp.ones((self.batch_size, *in_shape, self.in_channels))
         if with_time:
             mask = jnp.ones((self.batch_size, *in_shape, self.out_channels))
@@ -98,7 +101,7 @@ class TestUnet(chex.TestCase):
             mask = None
             t = None
 
-        out, _ = unet.init_with_output(rng, image, mask, t)
+        out, _ = unet.init_with_output(rng, is_train, image, mask, t)
         chex.assert_shape(out, (self.batch_size, *in_shape, self.out_channels))
 
     @chex.all_variants()
@@ -119,7 +122,7 @@ class TestUnet(chex.TestCase):
             with_time: with time or not.
             remat: remat or not.
         """
-        rng = {"params": jax.random.PRNGKey(0)}
+        rng = {"params": jax.random.PRNGKey(0), "dropout": jax.random.PRNGKey(1)}
         num_spatial_dims = 2
         patch_size = 4
         kernel_size = 3
@@ -139,6 +142,7 @@ class TestUnet(chex.TestCase):
             remat=remat,
         )
 
+        is_train = True
         image = jnp.ones((self.batch_size, *in_shape, self.in_channels))
         if with_time:
             mask = jnp.ones((self.batch_size, *in_shape, self.out_channels))
@@ -147,7 +151,9 @@ class TestUnet(chex.TestCase):
             mask = None
             t = None
 
-        out, _ = self.variant(unet.init_with_output)(rng, image, mask, t)
+        out, _ = self.variant(unet.init_with_output, static_argnums=(1,))(
+            rng, is_train, image, mask, t
+        )
         chex.assert_shape(out, (self.batch_size, *in_shape, self.out_channels))
 
     @chex.variants(with_jit=True)
@@ -167,11 +173,11 @@ class TestUnet(chex.TestCase):
             num_spatial_dims: number of spatial dimensions.
             with_time: with time or not.
         """
-        rng = {"params": jax.random.PRNGKey(0)}
+        rng = {"params": jax.random.PRNGKey(0), "dropout": jax.random.PRNGKey(1)}
         patch_size = 4
         kernel_size = 3
         scale_factor = 2
-        in_shape = (256, 256, 32)
+        in_shape = (128, 128, 12)
         num_channels = (4, 4, 8)
 
         unet = Unet(
@@ -185,6 +191,7 @@ class TestUnet(chex.TestCase):
             scale_factor=scale_factor,
         )
 
+        is_train = True
         image = jnp.ones((self.batch_size, *in_shape, self.in_channels))
         if with_time:
             mask = jnp.ones((self.batch_size, *in_shape, self.out_channels))
@@ -193,12 +200,14 @@ class TestUnet(chex.TestCase):
             mask = None
             t = None
 
-        out, _ = self.variant(unet.init_with_output)(rng, image, mask, t)
+        out, _ = self.variant(unet.init_with_output, static_argnums=(1,))(
+            rng, is_train, image, mask, t
+        )
         chex.assert_shape(out, (self.batch_size, *in_shape, self.out_channels))
 
     @parameterized.named_parameters(
-        ("Unet without time", False, 34194, 27.610577),
-        ("Unet with time", True, 36106, 29.420588),
+        ("Unet with Transformer without time", False, 33938, 27.629126),
+        ("Unet with Transformer and time", True, 35850, 29.501432),
     )
     def test_params_count(
         self,
@@ -215,7 +224,7 @@ class TestUnet(chex.TestCase):
             expected_params_count: expected number of parameters.
             expected_params_norm: expected parameters norm.
         """
-        rng = {"params": jax.random.PRNGKey(0)}
+        rng = {"params": jax.random.PRNGKey(0), "dropout": jax.random.PRNGKey(1)}
         num_spatial_dims = 2
         patch_size = 4
         kernel_size = 3
@@ -236,6 +245,7 @@ class TestUnet(chex.TestCase):
             remat=remat,
         )
 
+        is_train = True
         image = jnp.ones((self.batch_size, *in_shape, self.in_channels))
         if with_time:
             mask = jnp.ones((self.batch_size, *in_shape, self.out_channels))
@@ -244,11 +254,11 @@ class TestUnet(chex.TestCase):
             mask = None
             t = None
 
-        _, variables = unet.init_with_output(rng, image, mask, t)
+        _, variables = unet.init_with_output(rng, is_train, image, mask, t)
         params = variables["params"]
 
         got_params_count = sum(x.size for x in jax.tree_util.tree_leaves(params))
         assert got_params_count == expected_params_count
 
         got_params_norm = optax.global_norm(params)
-        assert got_params_norm == expected_params_norm
+        assert np.isclose(got_params_norm, expected_params_norm, rtol=1e-5, atol=1e-5)

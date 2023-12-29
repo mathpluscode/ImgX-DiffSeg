@@ -14,7 +14,7 @@ from typing import Callable
 import numpy as np
 from scipy.ndimage import binary_erosion, distance_transform_edt
 
-from imgx_datasets.preprocess import get_binary_mask_bounding_box
+from imgx.datasets.preprocess import get_binary_mask_bounding_box
 
 OneArgScalarFunc = Callable[[np.ndarray], float]
 TwoArgsScalarFunc = Callable[[np.ndarray, np.ndarray], float]

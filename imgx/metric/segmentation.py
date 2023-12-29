@@ -9,17 +9,18 @@ import jax.numpy as jnp
 import numpy as np
 
 from imgx.data.warp import get_coordinate_grid
+from imgx.datasets import DatasetInfo
 from imgx.metric import (
     aggregated_surface_distance,
     centroid_distance,
     class_proportion,
+    class_volume,
     dice_score,
     iou,
     normalized_surface_dice_from_distances,
     stability,
 )
 from imgx.metric.util import flatten_diffusion_metrics
-from imgx_datasets import DatasetInfo
 
 
 def get_jit_segmentation_confidence(
@@ -97,11 +98,17 @@ def get_jit_segmentation_metrics(
     scalars["mean_centroid_dist"] = jnp.nanmean(centroid_dist_bc, axis=1)
     scalars["mean_centroid_dist_without_background"] = jnp.nanmean(centroid_dist_bc[:, 1:], axis=1)
 
-    # class proportion (batch, num_classes)
+    # class proportion without considering spacing (batch, num_classes)
     for mask, mask_name in zip([mask_pred, mask_true], ["pred", "label"]):
         class_prop_bc = class_proportion(mask)
         for i in range(class_prop_bc.shape[-1]):
             scalars[f"class_{i}_proportion_{mask_name}"] = class_prop_bc[:, i]
+
+    # class volume considering spacing (batch, num_classes)
+    for mask, mask_name in zip([mask_pred, mask_true], ["pred", "label"]):
+        class_volume_bc = class_volume(mask, spacing)
+        for i in range(class_volume_bc.shape[-1]):
+            scalars[f"class_{i}_volume_{mask_name}"] = class_volume_bc[:, i]
 
     return scalars
 

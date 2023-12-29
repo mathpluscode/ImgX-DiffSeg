@@ -32,7 +32,7 @@ class TrainState(BaseTrainState):
 
 def create_train_state(
     key: jax.Array,
-    batch: chex.ArrayTree,
+    batch: dict[str, jnp.ndarray],
     model: nn.Module,
     config: DictConfig,
     initialized: Callable[[jax.Array, chex.ArrayTree, nn.Module], chex.ArrayTree],

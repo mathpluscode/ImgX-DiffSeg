@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 
 def aggregate_metrics(metrics: dict[str, chex.ArrayTree]) -> dict[str, chex.ArrayTree]:
-    """Calculate aggregated metrics.
+    """Calculate min/mean/max statistics for each key.
 
     Args:
         metrics: metric dict.
@@ -44,14 +44,14 @@ def aggregate_metrics_for_diffusion(
     return metrics_diff
 
 
-def aggregate_pmap_metrics(metrics: dict[str, chex.ArrayTree]) -> dict[str, chex.ArrayTree]:
-    """Aggregate metrics across replicates.
+def merge_aggregated_metrics(metrics: dict[str, chex.ArrayTree]) -> dict[str, chex.ArrayTree]:
+    """Merge/aggregate aggregated metrics.
 
     Args:
-        metrics: metric dict from pmap.
+        metrics: metric dict containing aggregated metrics.
 
     Returns:
-        aggregated metric dict.
+        Merged aggregated metric dict.
     """
     min_metrics = {}
     max_metrics = {}

@@ -19,21 +19,27 @@ from omegaconf import DictConfig
 from tqdm import tqdm
 
 from imgx import REPLICA_AXIS
-from imgx.data import AugmentationFn
-from imgx.data.affine import get_random_affine_augmentation_fn
-from imgx.data.augmentation import chain_aug_fns
-from imgx.data.patch import (
+from imgx.data.augmentation import AugmentationFn, chain_aug_fns
+from imgx.data.augmentation.affine import get_random_affine_augmentation_fn
+from imgx.data.augmentation.intensity import (
+    get_random_gamma_augmentation_fn,
+    get_rescale_intensity_fn,
+    rescale_intensity,
+)
+from imgx.data.augmentation.patch import (
     batch_patch_grid_mean_aggregate,
     batch_patch_grid_sample,
-    get_patch_shape_grid_from_config,
+    get_patch_grid,
     get_random_patch_fn,
 )
 from imgx.data.util import unpad
+from imgx.datasets.constant import IMAGE, LABEL, LABEL_PRED, UID
+from imgx.datasets.dataset_info import DatasetInfo
 from imgx.device import bind_rng_to_host_or_device, get_first_replica_values, unshard
 from imgx.diffusion.time_sampler import TimeSampler
 from imgx.experiment import Experiment
 from imgx.metric.segmentation import get_segmentation_metrics_per_step
-from imgx.metric.util import aggregate_pmap_metrics
+from imgx.metric.util import merge_aggregated_metrics
 from imgx.task.diffusion_segmentation.diffusion import DiffusionSegmentation
 from imgx.task.diffusion_segmentation.diffusion_step import get_diffusion_loss_step
 from imgx.task.diffusion_segmentation.gaussian_diffusion import (
@@ -42,9 +48,9 @@ from imgx.task.diffusion_segmentation.gaussian_diffusion import (
     GaussianDiffusionSegmentation,
 )
 from imgx.task.diffusion_segmentation.recycling_step import get_recycling_loss_step
+from imgx.task.diffusion_segmentation.save import save_diffusion_segmentation_prediction
 from imgx.task.diffusion_segmentation.self_conditioning_step import get_self_conditioning_loss_step
 from imgx.task.diffusion_segmentation.train_state import TrainState, create_train_state
-from imgx.task.segmentation.save import save_segmentation_prediction
 from imgx.task.util import decode_uids
 from imgx.train_state import (
     get_gradients,
@@ -53,13 +59,11 @@ from imgx.train_state import (
     restore_checkpoint,
     update_train_state,
 )
-from imgx_datasets.constant import IMAGE, LABEL, TEST_SPLIT, UID, VALID_SPLIT
-from imgx_datasets.dataset_info import DatasetInfo
 
 
 def initialized(
     key: jax.Array,
-    batch: chex.ArrayTree,
+    batch: dict[str, jnp.ndarray],
     model: nn.Module,
     dataset_info: DatasetInfo,
     self_conditioning: bool,
@@ -87,7 +91,9 @@ def initialized(
     if self_conditioning:
         mask = jnp.concatenate([mask, jnp.zeros_like(mask)], axis=-1)
     t = jnp.zeros((batch_size,), dtype=image.dtype)
-    variables = jax.jit(init, backend="cpu")({"params": key}, image, mask, t)
+    variables = jax.jit(init, backend="cpu", static_argnums=(1,))(
+        {"params": key}, False, image, mask, t  # is_train
+    )
     return variables["params"]
 
 
@@ -157,6 +163,7 @@ def sample_logits_progressive(
             mask_t = jnp.concatenate([mask_t, mask_pred], axis=-1)
         model_out = train_state.apply_fn(
             {"params": train_state.params},
+            False,  # is_train
             image,
             mask_t,
             t,
@@ -173,14 +180,14 @@ def sample_logits_progressive(
 
 def train_step(
     train_state: TrainState,
-    batch: chex.ArrayTree,
+    batch: dict[str, jnp.ndarray],
     key: jax.Array,
     aug_fn: Callable[[jax.Array, chex.ArrayTree], chex.ArrayTree],
     dataset_info: DatasetInfo,
     config: DictConfig,
     diffusion_model: DiffusionSegmentation,
     time_sampler: TimeSampler,
-) -> tuple[TrainState, jax.Array, chex.ArrayTree]:
+) -> tuple[TrainState, chex.ArrayTree]:
     """Perform a training step.
 
     Args:
@@ -195,7 +202,6 @@ def train_step(
 
     Returns:
         - new training state.
-        - new random key.
         - metric dict.
     """
     if config.task.recycling.use and config.task.self_conditioning.use:
@@ -231,14 +237,14 @@ def train_step(
         )
 
     # augment, calculate gradients, update train state
-    aug_key, step_key, new_key = jax.random.split(key, 3)
-    aug_key = bind_rng_to_host_or_device(aug_key, bind_to="device", axis_name=REPLICA_AXIS)
-    step_key = bind_rng_to_host_or_device(step_key, bind_to="device", axis_name=REPLICA_AXIS)
-    batch = aug_fn(aug_key, batch)
+    key = bind_rng_to_host_or_device(key, bind_to="device", axis_name=REPLICA_AXIS)
+    key = jax.random.fold_in(key=key, data=train_state.step)
+    key_aug, key_loss = jax.random.split(key)
+    batch = aug_fn(key_aug, batch)
     dynamic_scale, is_fin, aux, grads = get_gradients(
         train_state,
         loss_step,
-        input_dict={"batch": batch, "key": step_key},
+        input_dict={"batch": batch, "key": key_loss},
     )
     new_state = update_train_state(train_state, dynamic_scale, is_fin, grads)
 
@@ -272,36 +278,40 @@ def train_step(
         config=config,
     )
     metrics = {**metrics, **metrics_optim}
-    return new_state, new_key, metrics
+    return new_state, metrics
 
 
 def eval_step(
     train_state: TrainState,
-    batch: chex.ArrayTree,
+    batch: dict[str, jnp.ndarray],
     key: jax.Array,
-    patch_start_indices: np.ndarray,
-    patch_shape: tuple[int, ...],
     dataset_info: DatasetInfo,
     config: DictConfig,
     diffusion_model: DiffusionSegmentation,
-) -> tuple[jax.Array, jnp.ndarray]:
+) -> jnp.ndarray:
     """Perform an evaluation step.
 
     Args:
         train_state: training state.
         batch: training data without shard axis.
         key: random key.
-        patch_start_indices: patch start indices.
-        patch_shape: patch shape.
         dataset_info: dataset info with helper functions.
         config: entire config.
         diffusion_model: segmentation diffusion model.
 
     Returns:
-        - new random key.
-        - logits, shape starts with (batch, ..., num_timesteps).
+        logits, shape starts with (batch, ..., num_timesteps).
     """
+    key = bind_rng_to_host_or_device(key, bind_to="device", axis_name=REPLICA_AXIS)
+
+    patch_shape = tuple(config.data.loader.patch_shape)
+    patch_overlap = tuple(config.data.loader.patch_overlap)
     image_shape = batch[IMAGE].shape[1:-1]
+    patch_start_indices = get_patch_grid(
+        image_shape=image_shape,
+        patch_shape=patch_shape,
+        patch_overlap=patch_overlap,
+    )
     num_patches = patch_start_indices.shape[0]
     # (batch, num_patches, *patch_shape, num_channels)
     image_patches = batch_patch_grid_sample(
@@ -314,7 +324,11 @@ def eval_step(
     for i in range(num_patches):
         # (batch, *spatial_shape, num_classes, num_timesteps)
         key_i, key = jax.random.split(key)
-        image_i = image_patches[:, i, ...]
+        image_i = rescale_intensity(
+            image_patches[:, i, ...],
+            v_min=config.data.loader.data_augmentation.v_min,
+            v_max=config.data.loader.data_augmentation.v_max,
+        )
         lst_logits_i = list(
             sample_logits_progressive(
                 train_state=train_state,
@@ -337,18 +351,19 @@ def eval_step(
         start_indices=patch_start_indices,
         image_shape=image_shape,
     )
-    return key, logits
+    return logits
 
 
 class DiffusionSegmentationExperiment(Experiment):
     """Experiment for supervised training."""
 
     def train_init(
-        self, ckpt_dir: Path | None = None, step: int | None = None
+        self, batch: dict[str, jnp.ndarray], ckpt_dir: Path | None = None, step: int | None = None
     ) -> tuple[TrainState, int]:
         """Initialize data loader, loss, networks for training.
 
         Args:
+            batch: training data for multi-devices.
             ckpt_dir: checkpoint directory to restore from.
             step: checkpoint step to restore from, if None use the latest one.
 
@@ -358,21 +373,23 @@ class DiffusionSegmentationExperiment(Experiment):
         # the batch is for multi-devices
         # (num_models, ...)
         # num_models is not the same as num_devices_per_replica
-        batch = next(self.train_iter)
         batch = get_first_replica_values(batch)
 
-        # check image size
-        image_shape = self.dataset_info.image_spatial_shape
-        chex.assert_equal(batch[IMAGE].shape[1:-1], image_shape)
-
         # data augmentation
-        aug_fns: list[AugmentationFn] = [
+        aug_fns: list[AugmentationFn] = []
+        aug_fns += [
             get_random_affine_augmentation_fn(self.config),
             get_random_patch_fn(self.config),
+            get_random_gamma_augmentation_fn(self.config),
+            get_rescale_intensity_fn(self.config),
         ]
         aug_fn = chain_aug_fns(aug_fns)
         aug_rng = jax.random.PRNGKey(self.config["seed"])
         batch = aug_fn(aug_rng, batch)
+
+        # check image size
+        image_shape = self.dataset_info.image_spatial_shape
+        chex.assert_equal(batch[IMAGE].shape[1:-1], image_shape)
 
         # init train state on cpu first
         dtype = get_half_precision_dtype(self.config.half_precision)
@@ -430,7 +447,6 @@ class DiffusionSegmentationExperiment(Experiment):
             model_var_type=self.config.task.diffusion.model_var_type,
         )
 
-        patch_shape, patch_start_indices = get_patch_shape_grid_from_config(self.config)
         self.p_train_step = jax.pmap(
             partial(
                 train_step,
@@ -441,12 +457,11 @@ class DiffusionSegmentationExperiment(Experiment):
                 time_sampler=time_sampler,
             ),
             axis_name=REPLICA_AXIS,
+            donate_argnums=(0,),
         )
         self.p_eval_step = jax.pmap(
             partial(
                 eval_step,
-                patch_start_indices=patch_start_indices,
-                patch_shape=patch_shape,
                 dataset_info=self.dataset_info,
                 config=self.config,
                 diffusion_model=eval_diffusion_model,
@@ -459,37 +474,29 @@ class DiffusionSegmentationExperiment(Experiment):
     def eval_step(  # pylint:disable=too-many-statements
         self,
         train_state: TrainState,
+        iterator: Iterator[dict[str, jnp.ndarray]],
+        num_steps: int,
         key: jax.Array,
-        split: str,
         out_dir: Path | None = None,
-    ) -> tuple[jax.Array, dict[str, jnp.ndarray]]:
+    ) -> dict[str, jnp.ndarray]:
         """Evaluation on entire validation data set.
 
         Args:
             train_state: training state.
+            iterator: data iterator.
+            num_steps: number of steps for evaluation.
             key: random key.
-            split: split to evaluate.
             out_dir: output directory, if not None, predictions will be saved.
 
         Returns:
-            - new random key.
-            - metric dict.
+            metric dict.
         """
-        if split == VALID_SPLIT:
-            num_steps = self.dataset.num_valid_steps
-            split_iter = self.valid_iter
-        elif split == TEST_SPLIT:
-            num_steps = self.dataset.num_test_steps
-            split_iter = self.test_iter
-        else:
-            raise ValueError(f"Split {split} not supported for evaluation.")
-
         device_cpu = jax.devices("cpu")[0]
-        num_samples = 0
         lst_metrics = []
         lst_uids = []
-        for _ in tqdm(range(num_steps), total=num_steps):
-            batch = next(split_iter)
+        for i in tqdm(range(num_steps), total=num_steps):
+            key_batch = jax.vmap(jax.random.fold_in, in_axes=(0, None))(key, i)
+            batch = next(iterator)
 
             # get uids
             uids = batch.pop(UID)
@@ -497,36 +504,42 @@ class DiffusionSegmentationExperiment(Experiment):
             uids = decode_uids(uids)
 
             # evaluate the batch
-            metrics, label_pred, key = self.eval_batch(
+            uids, metrics, preds = self.eval_batch(
                 train_state=train_state,
-                key=key,
+                key=key_batch,
                 batch=batch,
                 uids=uids,
                 device_cpu=device_cpu,
-                out_dir=out_dir,
             )
-            num_samples_in_batch = label_pred.shape[0]
-            lst_uids += uids[:num_samples_in_batch]
-            num_samples += num_samples_in_batch
+            save_diffusion_segmentation_prediction(
+                label_pred=preds[LABEL_PRED],
+                uids=uids,
+                out_dir=out_dir,
+                tfds_dir=self.dataset_info.tfds_preprocessed_dir,
+            )
+            lst_uids += uids
             lst_metrics.append(metrics)
+
+            # https://github.com/google/jax/issues/10828
+            jax.clear_caches()
 
         # concatenate metrics across all samples
         # metrics, values of shape (num_samples,)
-        metrics = jax.tree_map(lambda *args: jnp.concatenate(args), *lst_metrics)
+        metrics = jax.tree_map(lambda *args: np.concatenate(args), *lst_metrics)
 
         # aggregate metrics
-        agg_metrics = aggregate_pmap_metrics(metrics)
+        agg_metrics = merge_aggregated_metrics(metrics)
         agg_metrics = jax.tree_map(lambda x: x.item(), agg_metrics)
-        agg_metrics["num_samples"] = num_samples
+        agg_metrics["num_samples"] = len(lst_uids)
 
         # save a csv file with per-sample metrics
         if out_dir is not None:
-            metrics = jax.tree_map(lambda x: np.asarray(x).tolist(), metrics)
+            metrics = jax.tree_map(lambda x: x.tolist(), metrics)
             df_metric = pd.DataFrame(metrics)
             df_metric[UID] = lst_uids
             df_metric.to_csv(out_dir / "metrics_per_sample.csv", index=False)
 
-        return key, agg_metrics
+        return agg_metrics
 
     def eval_batch(
         self,
@@ -535,10 +548,7 @@ class DiffusionSegmentationExperiment(Experiment):
         batch: dict[str, jnp.ndarray],
         uids: list[str],
         device_cpu: jax.Device,
-        out_dir: Path | None,
-        reference_suffix: str = "mask_preprocessed",
-        output_suffix: str = "mask_pred",
-    ) -> tuple[dict[str, jnp.ndarray], jnp.ndarray, jax.Array]:
+    ) -> tuple[list[str], dict[str, np.ndarray], dict[str, np.ndarray]]:
         """Evaluate a batch.
 
         Args:
@@ -547,22 +557,20 @@ class DiffusionSegmentationExperiment(Experiment):
             batch: batch data without uid.
             uids: uids in the batch.
             device_cpu: cpu device.
-            out_dir: output directory, if not None, predictions will be saved.
-            reference_suffix: suffix of reference image.
-            output_suffix: suffix of output image.
 
         Returns:
-            metrics, each item has shape (num_shards*batch,).
-            label_pred: predicted label, of shape (num_shards*batch, *spatial_shape).
-            key: random key.
+            uids: uids in the batch, excluding padded samples.
+            metrics: each item has shape (num_samples,).
+            prediction dict: each item has shape (num_samples, ...).
         """
         # logits (num_shards*batch, *spatial_shape, num_classes)
         # label (num_shards*batch, *spatial_shape)
-        key, logits = self.p_eval_step(train_state, batch, key)
+        logits = self.p_eval_step(train_state, batch, key)
         logits = unshard(logits, device=device_cpu)
         label = unshard(batch[LABEL], device=device_cpu)
 
         # remove padded examples
+        num_samples_in_batch = len(uids)
         if "" in uids:
             num_samples_in_batch = uids.index("")
             uids = uids[:num_samples_in_batch]
@@ -576,16 +584,8 @@ class DiffusionSegmentationExperiment(Experiment):
             dataset_info=self.dataset_info,
         )
 
-        if out_dir is None:
-            return metrics, label_pred, key
-
-        for i in range(logits.shape[-1]):
-            save_segmentation_prediction(
-                preds=np.array(label_pred[..., i], dtype=int),
-                uids=uids,
-                out_dir=out_dir / f"step_{i}",
-                tfds_dir=self.dataset_info.tfds_preprocessed_dir,
-                reference_suffix=reference_suffix,
-                output_suffix=output_suffix,
-            )
-        return metrics, label_pred, key
+        # change to numpy array
+        metrics = jax.tree_map(np.asarray, metrics)
+        label_pred = np.asarray(label_pred, dtype=np.int8)
+        preds = {LABEL_PRED: label_pred}
+        return uids, metrics, preds

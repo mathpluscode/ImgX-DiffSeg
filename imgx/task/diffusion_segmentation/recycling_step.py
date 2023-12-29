@@ -7,12 +7,12 @@ import jax.numpy as jnp
 from jax import lax
 from omegaconf import DictConfig
 
+from imgx.datasets.constant import IMAGE, LABEL
+from imgx.datasets.dataset_info import DatasetInfo
 from imgx.diffusion.time_sampler import TimeSampler
 from imgx.task.diffusion_segmentation.diffusion import DiffusionSegmentation
 from imgx.task.diffusion_segmentation.diffusion_step import get_loss_logits_metrics
 from imgx.task.diffusion_segmentation.train_state import TrainState
-from imgx_datasets.constant import IMAGE, LABEL
-from imgx_datasets.dataset_info import DatasetInfo
 
 
 def get_recycling_loss_step(
@@ -46,15 +46,17 @@ def get_recycling_loss_step(
 
     def loss_step(
         params: chex.ArrayTree,
-        batch: chex.ArrayTree,
+        batch: dict[str, jnp.ndarray],
         key: jax.Array,
     ) -> tuple[jnp.ndarray, tuple[jnp.ndarray, chex.ArrayTree, jnp.ndarray, jnp.ndarray]]:
         """Apply forward and calculate loss."""
+        key_dropout_re, key_dropout, key_t, key_noise_re, key_noise = jax.random.split(
+            key=key, num=5
+        )
         image, label = batch[IMAGE], batch[LABEL]
         mask_true = dataset_info.label_to_mask(label, axis=-1, dtype=image.dtype)
         x_start = diffusion_model.mask_to_x(mask=mask_true)
         batch_size = image.shape[0]
-        key_t, key_noise_re, key_noise = jax.random.split(key=key, num=3)
 
         # t, t_index, probs_t
         # t_re, t_index_re
@@ -99,9 +101,11 @@ def get_recycling_loss_step(
         mask_t_re = diffusion_model.x_to_mask(x_t_re)
         model_out_re = train_state.apply_fn(
             {"params": params},
+            True,  # is_train
             image,
             mask_t_re,
             t_re,
+            rngs={"dropout": key_dropout_re},
         )
         x_start_pred_re = diffusion_model.predict_xstart_from_model_out_xt(
             model_out=model_out_re,
@@ -128,9 +132,11 @@ def get_recycling_loss_step(
         # forward
         model_out = train_state.apply_fn(
             {"params": params},
+            True,  # is_train
             image,
             mask_t,
             t,
+            rngs={"dropout": key_dropout},
         )
 
         # loss

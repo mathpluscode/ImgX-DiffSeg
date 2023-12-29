@@ -150,9 +150,7 @@ class TestResample(chex.TestCase):
         expected_label: np.ndarray,
         num_channels: int,
     ) -> None:
-        """Test affine matrix values.
-
-        Test affine matrix shapes, and test random seed impact.
+        """Test output shapes.
 
         Args:
             image: input image batch.

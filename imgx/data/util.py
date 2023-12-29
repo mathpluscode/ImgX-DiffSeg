@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.experimental.numpy as tnp
 
-from imgx_datasets.constant import IMAGE, LABEL
+from imgx.datasets.constant import IMAGE, LABEL
 
 
 def get_batch_size(

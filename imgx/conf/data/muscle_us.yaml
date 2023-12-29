@@ -5,9 +5,14 @@ loader:
   patch_shape: [480, 512]
   patch_overlap: [0, 0]
   data_augmentation:
-    max_rotation: [0.088] # roughly 5 degrees
-    max_translation: [10, 10]
-    max_scaling: [0.15, 0.15]
+    max_rotation: 30 # degrees
+    max_zoom: 0.2 # as a fraction of the image size
+    max_shear: 30 # degrees
+    max_shift: 0.3 # as a fraction of the image size
+    max_log_gamma: 0.3
+    v_min: 0.0 # minimum value for intensity
+    v_max: 1.0 # maximum value for intensity
+    p: 0.5 # probability of applying each augmentation
 
 trainer:
   max_num_samples: 512_000

@@ -11,7 +11,7 @@ authors = [
 description = "A Jax-based deep learning toolkit for biomedical applications."
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
-version = "0.3.1"
+version = "0.3.2"
 
 [project.scripts]
 imgx_train="imgx.run_train:main"
@@ -19,8 +19,8 @@ imgx_valid="imgx.run_valid:main"
 imgx_test="imgx.run_test:main"
 
 [tool.setuptools]
-packages = ["imgx", "imgx_datasets"]
-package-dir = {"imgx"="./imgx", "imgx_datasets"="./imgx_datasets"}
+packages = ["imgx"]
+package-dir = {"imgx"="./imgx"}
 
 # pytest
 [tool.pytest.ini_options]

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import jax.numpy as jnp
 import jax.random
 from absl import logging
+from jax import lax
 
 from imgx.diffusion.diffusion import Diffusion
 from imgx.diffusion.gaussian.variance_schedule import downsample_beta_schedule, get_beta_schedule
@@ -290,7 +291,6 @@ class GaussianDiffusion(Diffusion):
             return model_out, log_variance
 
         if self.model_var_type == "fixed_large":
-            # TODO why appending?
             variance = jnp.append(self.posterior_variance[1], self.betas[1:])
             log_variance = extract_and_expand(jnp.log(variance), t_index=t_index, ndim=x_t.ndim)
             return model_out, log_variance
@@ -564,11 +564,11 @@ class GaussianDiffusion(Diffusion):
             model_out, log_variance = jnp.split(model_out, indices_or_sections=2, axis=-1)
             # apply a stop-gradient to the mean output for the vlb to prevent
             # this loss change mean prediction
-            model_out_vlb = jax.lax.stop_gradient(model_out)
+            model_out_vlb = lax.stop_gradient(model_out)
             # model_out (batch, ..., num_classes*2)
             model_out_vlb = jnp.concatenate([model_out_vlb, log_variance], axis=-1)
         else:
-            model_out_vlb = jax.lax.stop_gradient(model_out)
+            model_out_vlb = lax.stop_gradient(model_out)
 
         # same shape as x_t or broadcast-compatible
         # q(x_{t-1} | x_t, x_0)

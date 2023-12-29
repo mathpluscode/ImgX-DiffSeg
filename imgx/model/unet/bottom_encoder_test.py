@@ -24,23 +24,24 @@ class TestBottomEncoderUnet(chex.TestCase):
     t_size = 3
 
     @chex.all_variants()
-    @parameterized.named_parameters(
-        ("2D with time", (5, 6), True),
-        ("2D without time", (5, 6), False),
-        ("3D with time", (5, 6, 7), True),
-        ("3D without time", (5, 6, 7), False),
+    @parameterized.product(
+        spatial_shape=[(5, 6), (5, 6, 7)],
+        with_time=[True, False],
+        is_train=[True, False],
     )
     def test_output_shape(
         self,
         spatial_shape: tuple[int, ...],
         with_time: bool,
+        is_train: bool,
     ) -> None:
         """Test output shape."""
         rng = {"params": jax.random.PRNGKey(0)}
-        encoder = BottomImageEncoderUnet(
-            num_heads=self.num_heads,
-        )
+        kernel_size = (3,) * len(spatial_shape)
+        encoder = BottomImageEncoderUnet(num_heads=self.num_heads, kernel_size=kernel_size)
         image_emb = jnp.ones((self.batch_size, *spatial_shape, self.model_size))
         t_emb = jnp.ones((self.batch_size, self.t_size)) if with_time else None
-        out, _ = self.variant(encoder.init_with_output)(rng, image_emb, t_emb)
+        out, _ = self.variant(encoder.init_with_output, static_argnums=(1,))(
+            rng, is_train, image_emb, t_emb
+        )
         chex.assert_shape(out, (self.batch_size, *spatial_shape, self.model_size))

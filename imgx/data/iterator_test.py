@@ -11,8 +11,8 @@ from chex._src import fake
 from omegaconf import DictConfig
 
 from imgx.data.iterator import DatasetIterator, add_foreground_range, get_image_tfds_dataset
-from imgx_datasets import AMOS_CT, BRATS2021_MR, INFO_MAP, MALE_PELVIC_MR, MUSCLE_US
-from imgx_datasets.constant import FOREGROUND_RANGE, IMAGE, LABEL, UID
+from imgx.datasets import AMOS_CT, BRATS2021_MR, INFO_MAP, MALE_PELVIC_MR, MUSCLE_US
+from imgx.datasets.constant import FOREGROUND_RANGE, IMAGE, LABEL, UID
 
 
 # Set `FLAGS.chex_n_cpu_devices` CPU devices for all tests.
@@ -59,9 +59,9 @@ class TestImageIterator(chex.TestCase):
                     "loader": {
                         "max_num_samples_per_split": max_num_samples_per_split,
                         "data_augmentation": {
-                            "max_rotation": [0.088, 0.088, 0.088],
-                            "max_translation": [20, 20, 4],
-                            "max_scaling": [0.15, 0.15, 0.15],
+                            "max_rotation": 30,
+                            "max_shift": 0.3,
+                            "max_zoom": 0.2,
                         },
                     },
                     "trainer": {
@@ -133,7 +133,7 @@ class TestImageShape(chex.TestCase):
         ("Muscle US", MUSCLE_US),
         ("BraTS2021 MR", BRATS2021_MR),
     )
-    def test_shape(
+    def test_shapes(
         self,
         dataset_name: str,
     ) -> None:
@@ -159,8 +159,8 @@ class TestImageShape(chex.TestCase):
                         "max_num_samples_per_split": max_num_samples_per_split,
                         "data_augmentation": {
                             "max_rotation": [0.088, 0.088, 0.088],
-                            "max_translation": [20, 20, 4],
-                            "max_scaling": [0.15, 0.15, 0.15],
+                            "max_shift": [20, 20, 4],
+                            "max_zoom": [0.15, 0.15, 0.15],
                         },
                     },
                     "trainer": {

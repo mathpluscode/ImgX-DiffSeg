@@ -105,7 +105,7 @@ class TestTimeSampler(chex.TestCase):
             3,
         ),
     )
-    def test_shape(
+    def test_shapes(
         self,
         uniform_time_sampling: bool,
         t_index_min: int,

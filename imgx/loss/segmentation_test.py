@@ -5,9 +5,10 @@ import chex
 import jax.numpy as jnp
 from absl.testing import parameterized
 from chex._src import fake
+from omegaconf import DictConfig
 
+from imgx.datasets import INFO_MAP
 from imgx.loss.segmentation import segmentation_loss
-from imgx_datasets import INFO_MAP
 
 
 # Set `FLAGS.chex_n_cpu_devices` CPU devices for all tests.
@@ -35,7 +36,7 @@ class TestSegmentationLoss(chex.TestCase):
             },
         ],
     )
-    def test_shape(
+    def test_shapes(
         self,
         dataset_name: str,
         loss_config: dict[str, float],
@@ -59,7 +60,7 @@ class TestSegmentationLoss(chex.TestCase):
             partial(
                 segmentation_loss,
                 dataset_info=dataset_info,
-                loss_config=loss_config,
+                loss_config=DictConfig(loss_config),
             )
         )(logits, label)
         chex.assert_shape(got_loss_batch, (self.batch_size,))

@@ -4,6 +4,7 @@ from __future__ import annotations
 import chex
 import jax
 import jax.numpy as jnp
+from jax import lax
 
 
 def broadcast_to_local_devices(value: chex.ArrayTree) -> chex.ArrayTree:
@@ -58,7 +59,7 @@ def bind_rng_to_host_or_device(
     if bind_to == "host":
         return jax.random.fold_in(rng, jax.process_index())
     if bind_to == "device":
-        return jax.random.fold_in(rng, jax.lax.axis_index(axis_name))
+        return jax.random.fold_in(rng, lax.axis_index(axis_name))
     raise ValueError("`bind_to` should be one of the `[None, 'host', 'device']`")
 
 
