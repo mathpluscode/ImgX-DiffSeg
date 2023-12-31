@@ -387,10 +387,6 @@ class DiffusionSegmentationExperiment(Experiment):
         aug_rng = jax.random.PRNGKey(self.config["seed"])
         batch = aug_fn(aug_rng, batch)
 
-        # check image size
-        image_shape = self.dataset_info.image_spatial_shape
-        chex.assert_equal(batch[IMAGE].shape[1:-1], image_shape)
-
         # init train state on cpu first
         dtype = get_half_precision_dtype(self.config.half_precision)
         model = instantiate(self.config.task.model, dtype=dtype)
